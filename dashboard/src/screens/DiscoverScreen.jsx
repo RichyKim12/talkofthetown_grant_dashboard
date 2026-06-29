@@ -79,7 +79,7 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
             busyText={phase === "searching" ? "Searching…" : "Ranking…"}
             variant="primary"
             size="lg"
-            icon={<IconSparkle width={18} height={18} />}
+            
           >
             {grants.length ? "Search again" : "Find grants"}
           </ActionButton>
