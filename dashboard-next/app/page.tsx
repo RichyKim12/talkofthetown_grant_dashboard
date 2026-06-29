@@ -15,6 +15,16 @@ import { ProposalsScreen } from "@/components/screens/ProposalsScreen";
 export default function DashboardRoot() {
   const [paletteKey, setPaletteKey] = useState<keyof typeof PALETTES>("harvest");
   const [screen, setScreen] = useState("profile");
+  interface ProfileData {
+    orgName: string;
+    yearFounded: string;
+    employees: string;
+    annualIncome: string;
+    serviceArea: string;
+    mission: string;
+    focuses: string[];
+    customFocuses: string[];
+  }
   const [profile, setProfile] = useState(null);
   const [grants, setGrants] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
