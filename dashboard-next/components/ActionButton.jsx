@@ -47,7 +47,8 @@ export function ActionButton({
     try {
       await onPress();
     } finally {
-      if (mounted.current) setBusy(false);
+      
+      setBusy(false);
     }
   };
 

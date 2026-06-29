@@ -10,11 +10,12 @@
   font-size: 26px;
   margin: 0 0 8px;
   font-weight: 700;
+  color: #000000; /* Overridden to solid black */
 }
 
 .screen-header p {
   font-size: 15.5px;
-  color: var(--text-secondary);
+  color: #000000; /* Overridden to solid black instead of var(--text-secondary) */
   margin: 0;
   max-width: 640px;
 }

@@ -6,30 +6,39 @@ import { ActionButton, Spinner } from "../ActionButton";
 import { DownloadMenu } from "../DownloadMenu";
 import { DraftEditor } from "../DraftEditor";
 import { IconFile, IconSparkle, IconCheck } from "../icons";
-import { generateProposal } from "../../utils/proposalService";
 import { timeAgo } from "../../utils/formatters";
-// import "../styles/Proposals.css";
-
-/* ============================================================
-   PROPOSAL DRAFTS SCREEN
-   One card per selected grant. Generating, reviewing, and
-   downloading all happen without leaving this screen — the
-   review/edit step opens in a modal so context (which grant,
-   which list) is never lost.
-   ============================================================ */
 
 export function ProposalsScreen({ profile, selectedGrants, drafts, setDrafts, addToast, goDiscover }) {
   const [activeDraftId, setActiveDraftId] = useState(null);
   const [generatingIds, setGeneratingIds] = useState([]);
 
   const generateOne = async (grant) => {
+    // Standardize naming fallbacks for messaging
+    const grantName = grant.title || grant.name || "Selected Grant";
+    
     setGeneratingIds((ids) => [...ids, grant.id]);
     try {
-      const text = await generateProposal(profile, grant);
-      setDrafts((prev) => ({ ...prev, [grant.id]: { text, generatedAt: new Date(), grant } }));
-      addToast(`Draft ready for ${grant.name}`, "success");
+      // Connect directly to our secure Next.js backend endpoint wrapper
+      const response = await fetch("/api/proposals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile, grant }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed network response during proposal generation.");
+      }
+
+      setDrafts((prev) => ({ 
+        ...prev, 
+        [grant.id]: { text: data.text, generatedAt: new Date(), grant } 
+      }));
+      addToast(`Draft ready for ${grantName}`, "success");
     } catch (err) {
-      addToast(`Couldn't write a draft for ${grant.name}. Try again.`, "error");
+      console.error(err);
+      addToast(`Couldn't write a draft for ${grantName}. Try again.`, "error");
     } finally {
       setGeneratingIds((ids) => ids.filter((x) => x !== grant.id));
     }
@@ -41,6 +50,7 @@ export function ProposalsScreen({ profile, selectedGrants, drafts, setDrafts, ad
       addToast("All selected grants already have drafts.", "info");
       return;
     }
+    // Fire generation requests concurrently via Promise.all
     await Promise.all(toGenerate.map((g) => generateOne(g)));
   };
 
@@ -76,50 +86,56 @@ export function ProposalsScreen({ profile, selectedGrants, drafts, setDrafts, ad
         }
       />
 
-      <div className="proposal-grid">
+      <div className="proposal-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "1.5rem", marginTop: "1.5rem" }}>
         {selectedGrants.map((grant) => {
           const draft = drafts[grant.id];
           const isGenerating = generatingIds.includes(grant.id);
+          
+          // Fallback UI layers to bind the Gemini discovery object structural fields securely
+          const displayName = grant.title || grant.name;
+          const displayFunder = grant.source || grant.funder;
+          const minAmt = grant.amountMin?.toLocaleString() || "0";
+          const maxAmt = grant.amountMax?.toLocaleString() || "0";
+
           return (
-            <div className="proposal-card" key={grant.id}>
-              <div className="proposal-card-head">
+            <div className="proposal-card" key={grant.id} style={{ border: "1px solid var(--border, #e5e7eb)", padding: "1.25rem", borderRadius: "0.5rem", background: "#fff", display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: "180px" }}>
+              <div className="proposal-card-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1rem" }}>
                 <div>
-                  <h3>{grant.name}</h3>
-                  <p>
-                    {grant.funder} · ${grant.amountMin.toLocaleString()}–${grant.amountMax.toLocaleString()}
+                  <h3 style={{ margin: "0 0 0.25rem 0", fontSize: "1.1rem" }}>{displayName}</h3>
+                  <p style={{ margin: 0, color: "var(--text-secondary, #4b5563)", fontSize: "0.9rem" }}>
+                    {displayFunder} · ${minAmt}–${maxAmt}
                   </p>
                 </div>
                 {draft && (
-                  <span className="status-pill status-ready">
+                  <span className="status-pill status-ready" style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem", background: "#ecfdf5", color: "#065f46", padding: "0.25rem 0.5rem", borderRadius: "9999px", fontSize: "0.75rem", fontWeight: "600", whiteSpace: "nowrap" }}>
                     <IconCheck width={13} height={13} /> Draft ready
                   </span>
                 )}
               </div>
 
               {isGenerating && (
-                <div className="generating-block" role="status" aria-live="polite">
+                <div className="generating-block" role="status" aria-live="polite" style={{ display: "flex", gap: "0.75rem", background: "var(--bg-muted, #f9fafb)", padding: "1rem", borderRadius: "0.375rem" }}>
                   <Spinner size={20} />
                   <div>
-                    <p className="generating-title">Writing your proposal…</p>
-                    <p className="generating-sub">
-                      This usually takes a few moments. Feel free to wait — the button is locked so it won't double-submit.
+                    <p className="generating-title" style={{ margin: "0 0 0.15rem 0", fontWeight: "600", fontSize: "0.9rem" }}>Writing your proposal…</p>
+                    <p className="generating-sub" style={{ margin: 0, fontSize: "0.8rem", color: "var(--text-secondary, #6b7280)", lineHeight: "1.3" }}>
+                      This usually takes a few moments. Feel free to wait.
                     </p>
                   </div>
                 </div>
               )}
 
               {!draft && !isGenerating && (
-                <ActionButton onPress={() => generateOne(grant)} variant="primary" busyText="Writing…" icon={<IconSparkle width={16} height={16} />} fullWidth>
+                <ActionButton onPress={() => generateOne(grant)} variant="primary" busyText="Writing…" fullWidth>
                   Write proposal draft
                 </ActionButton>
               )}  
 
               {draft && !isGenerating && (
-                <div className="proposal-actions">
-                  <button className="btn btn-secondary" onClick={() => setActiveDraftId(grant.id)}>
+                <div className="proposal-actions" style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
+                  <button className="btn btn-secondary" onClick={() => setActiveDraftId(grant.id)} style={{ flex: 1, padding: "0.5rem", border: "1px solid var(--border, #d1d5db)", borderRadius: "0.375rem", background: "#fff", cursor: "pointer" }}>
                     Review draft
                   </button>
-                  
                   <DownloadMenu grant={grant} draft={draft} addToast={addToast} />
                 </div>
               )}
@@ -129,8 +145,8 @@ export function ProposalsScreen({ profile, selectedGrants, drafts, setDrafts, ad
       </div>
 
       {activeDraft && (
-        <Modal title={`Draft: ${activeDraft.grant.name}`} onClose={() => setActiveDraftId(null)} wide>
-          <p className="draft-meta">
+        <Modal title={`Draft: ${activeDraft.grant.title || activeDraft.grant.name}`} onClose={() => setActiveDraftId(null)} wide>
+          <p className="draft-meta" style={{ color: "var(--text-secondary, #6b7280)", fontSize: "0.85rem", marginBottom: "1rem" }}>
             Generated {timeAgo(activeDraft.generatedAt)} · You can edit this text before downloading.
           </p>
           <DraftEditor
