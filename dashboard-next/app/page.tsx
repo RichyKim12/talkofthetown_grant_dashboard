@@ -13,7 +13,7 @@ import { DiscoverScreen } from "@/components/screens/DiscoverScreen";
 import { ProposalsScreen } from "@/components/screens/ProposalsScreen";
 
 export default function DashboardRoot() {
-  const [paletteKey, setPaletteKey] = useState("harvest");
+  const [paletteKey, setPaletteKey] = useState<keyof typeof PALETTES>("harvest");
   const [screen, setScreen] = useState("profile");
   const [profile, setProfile] = useState(null);
   const [grants, setGrants] = useState([]);
