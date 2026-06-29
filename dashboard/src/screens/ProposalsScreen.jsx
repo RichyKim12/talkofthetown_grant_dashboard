@@ -110,16 +110,14 @@ export function ProposalsScreen({ profile, selectedGrants, drafts, setDrafts, ad
                 <ActionButton onPress={() => generateOne(grant)} variant="primary" busyText="Writing…" icon={<IconSparkle width={16} height={16} />} fullWidth>
                   Write proposal draft
                 </ActionButton>
-              )}
+              )}  
 
               {draft && !isGenerating && (
                 <div className="proposal-actions">
                   <button className="btn btn-secondary" onClick={() => setActiveDraftId(grant.id)}>
                     Review draft
                   </button>
-                  <ActionButton onPress={() => generateOne(grant)} variant="ghost" busyText="Rewriting…">
-                    Regenerate
-                  </ActionButton>
+                  
                   <DownloadMenu grant={grant} draft={draft} addToast={addToast} />
                 </div>
               )}
