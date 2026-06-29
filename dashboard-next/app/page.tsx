@@ -1,6 +1,5 @@
 "use client";
 
-
 import React, { useState, useEffect } from "react";
 import { PALETTES } from "@/data/palettes";
 // import { SEED_PROFILE } from "@/data/mockData";
@@ -12,21 +11,36 @@ import { ProfileScreen } from "@/components/screens/ProfileScreen";
 import { DiscoverScreen } from "@/components/screens/DiscoverScreen";
 import { ProposalsScreen } from "@/components/screens/ProposalsScreen";
 
+// 1. Defining the interface outside the component keeps the layout clean
+interface ProfileData {
+  orgName: string;
+  yearFounded: string;
+  employees: string;
+  annualIncome: string;
+  serviceArea: string;
+  mission: string;
+  focuses: string[];
+  customFocuses: string[];
+}
+
 export default function DashboardRoot() {
-  const [paletteKey, setPaletteKey] = useState("harvest");
+  const [paletteKey, setPaletteKey] = useState<keyof typeof PALETTES>("harvest");
   const [screen, setScreen] = useState("profile");
-  const [profile, setProfile] = useState(null);
-  const [grants, setGrants] = useState([]);
-  const [selectedIds, setSelectedIds] = useState([]);
-  const [drafts, setDrafts] = useState({});
-  const [completed, setCompleted] = useState(new Set());
+  
+  // 2. Connected the interface to the state here:
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  
+  // 3. Added basic typing to arrays/objects to prevent implicit 'any' warnings down the line
+  const [grants, setGrants] = useState<any[]>([]);
+  const [selectedIds, setSelectedIds] = useState<any[]>([]);
+  const [drafts, setDrafts] = useState<Record<string, any>>({});
+  const [completed, setCompleted] = useState<Set<string>>(new Set());
   const [navOpen, setNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const { toasts, addToast, dismissToast } = useToasts();
 
   const palette = PALETTES[paletteKey];
-
 
   useEffect(() => {
     async function loadProfile() {
@@ -67,11 +81,11 @@ export default function DashboardRoot() {
     Object.entries(palette).filter(([k]) => k.startsWith("--"))
   );
 
-  const markDone = (key) => setCompleted((prev) => new Set(prev).add(key));
+  const markDone = (key: string) => setCompleted((prev) => new Set(prev).add(key));
 
-  const selectedGrants = grants.filter((g) => selectedIds.includes(g.id));
+  const selectedGrants = grants.filter((g: any) => selectedIds.includes(g.id));
 
-  const goTo = (key) => {
+  const goTo = (key: string) => {
     setScreen(key);
     setNavOpen(false);
   };
@@ -100,7 +114,11 @@ export default function DashboardRoot() {
         </div>
         <ProgressSteps current={screen} onJump={goTo} completed={completed} />
         <div className="sidebar-footer">
-          <PaletteSwitcher paletteKey={paletteKey} setPaletteKey={setPaletteKey} />
+          {/* Handing type-safe state modifiers downstream */}
+          <PaletteSwitcher 
+            paletteKey={paletteKey} 
+            setPaletteKey={setPaletteKey as any} 
+          />
         </div>
       </aside>
 
@@ -122,7 +140,7 @@ export default function DashboardRoot() {
             grants={grants}
             setGrants={setGrants}
             selectedIds={selectedIds}
-            setSelectedIds={(updater) => {
+            setSelectedIds={(updater: any) => {
               setSelectedIds(updater);
               markDone("discover");
             }}
