@@ -1,12 +1,14 @@
+"use client";
+
 import React, { useState } from "react";
-import { ScreenHeader, EmptyState, Modal } from "../components/Layout";
-import { ActionButton, Spinner } from "../components/ActionButton";
-import { DownloadMenu } from "../components/DownloadMenu";
-import { DraftEditor } from "../components/DraftEditor";
-import { IconFile, IconSparkle, IconCheck } from "../components/icons";
-import { generateProposal } from "../utils/proposalService";
-import { timeAgo } from "../utils/formatters";
-import "../styles/Proposals.css";
+import { ScreenHeader, EmptyState, Modal } from "../Layout";
+import { ActionButton, Spinner } from "../ActionButton";
+import { DownloadMenu } from "../DownloadMenu";
+import { DraftEditor } from "../DraftEditor";
+import { IconFile, IconSparkle, IconCheck } from "../icons";
+import { generateProposal } from "../../utils/proposalService";
+import { timeAgo } from "../../utils/formatters";
+// import "../styles/Proposals.css";
 
 /* ============================================================
    PROPOSAL DRAFTS SCREEN

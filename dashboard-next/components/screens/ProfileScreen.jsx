@@ -1,9 +1,11 @@
+"use client";
+
 import React, { useState, useEffect } from "react";
-import { ScreenHeader, Field } from "../components/Layout";
-import { ActionButton } from "../components/ActionButton";
-import { IconCheck } from "../components/icons";
-import { FOCUS_GROUPS, ALL_FOCUS_OPTIONS } from "../data/mockData";
-import "../styles/Profile.css";
+import { ScreenHeader, Field } from "../Layout";
+import { ActionButton } from "../ActionButton";
+import { IconCheck } from "../icons";
+import { FOCUS_GROUPS, ALL_FOCUS_OPTIONS } from "../../data/mockData";
+// import "../../styles/Profile.css";
 
 /* ============================================================
    ORGANIZATION PROFILE SCREEN

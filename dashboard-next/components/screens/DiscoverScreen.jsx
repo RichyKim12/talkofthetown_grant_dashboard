@@ -1,10 +1,12 @@
+"use client";
+
 import React, { useState } from "react";
-import { ScreenHeader, EmptyState } from "../components/Layout";
-import { ActionButton, Spinner } from "../components/ActionButton";
-import { GrantCard, SkeletonGrantCard } from "../components/GrantCard";
-import { IconSearch, IconSparkle } from "../components/icons";
-import { discoverGrants } from "../utils/grantService";
-import "../styles/Discover.css";
+import { ScreenHeader, EmptyState } from "../Layout";
+import { ActionButton, Spinner } from "../ActionButton";
+import { GrantCard, SkeletonGrantCard } from "../GrantCard";
+import { IconSearch, IconSparkle } from "../icons";
+import { discoverGrants } from "../../utils/grantService";
+// import "../styles/Discover.css";
 
 /* ============================================================
    DISCOVER & SELECT SCREEN

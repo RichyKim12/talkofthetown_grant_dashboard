@@ -1,29 +1,17 @@
+"use client";
+
 import React, { useState } from "react";
-import { PALETTES } from "./data/palettes";
-import { SEED_PROFILE } from "./data/mockData";
-import { Toast, useToasts } from "./components/Toast";
-import { ProgressSteps } from "./components/ProgressSteps";
-import { PaletteSwitcher } from "./components/PaletteSwitcher";
-import { IconClipboard } from "./components/icons";
-import { ProfileScreen } from "./screens/ProfileScreen";
-import { DiscoverScreen } from "./screens/DiscoverScreen";
-import { ProposalsScreen } from "./screens/ProposalsScreen";
-import "./styles/App.css";
+import { PALETTES } from "@/data/palettes";
+import { SEED_PROFILE } from "@/data/mockData";
+import { Toast, useToasts } from "@/components/Toast";
+import { ProgressSteps } from "@/components/ProgressSteps";
+import { PaletteSwitcher } from "@/components/PaletteSwitcher";
+import { IconClipboard } from "@/components/icons";
+import { ProfileScreen } from "@/components/screens/ProfileScreen";
+import { DiscoverScreen } from "@/components/screens/DiscoverScreen";
+import { ProposalsScreen } from "@/components/screens/ProposalsScreen";
 
-/* ============================================================
-   ROOT APP
-   Owns the cross-screen state (profile, grants, selection,
-   drafts, which screen is active) and renders the sidebar +
-   whichever screen is current. Each screen is otherwise
-   self-contained and only talks to the outside through props.
-
-   Three-step pipeline:
-     1. Organization profile
-     2. Discover & select grants  (merged search + shortlist)
-     3. Proposal drafts
-   ============================================================ */
-
-export default function App() {
+export default function DashboardRoot() {
   const [paletteKey, setPaletteKey] = useState("harvest");
   const [screen, setScreen] = useState("profile");
   const [profile, setProfile] = useState(SEED_PROFILE);
@@ -36,7 +24,9 @@ export default function App() {
   const { toasts, addToast, dismissToast } = useToasts();
 
   const palette = PALETTES[paletteKey];
-  const cssVars = Object.fromEntries(Object.entries(palette).filter(([k]) => k.startsWith("--")));
+  const cssVars = Object.fromEntries(
+    Object.entries(palette).filter(([k]) => k.startsWith("--"))
+  );
 
   const markDone = (key) => setCompleted((prev) => new Set(prev).add(key));
 
@@ -48,10 +38,14 @@ export default function App() {
   };
 
   return (
-    <div className="app-root" style={cssVars}>
+    <div className="app-root" style={cssVars as React.CSSProperties}>
       <Toast toasts={toasts} onDismiss={dismissToast} />
 
-      <button className="mobile-nav-toggle" onClick={() => setNavOpen((o) => !o)} aria-label="Toggle navigation">
+      <button 
+        className="mobile-nav-toggle" 
+        onClick={() => setNavOpen((o) => !o)} 
+        aria-label="Toggle navigation"
+      >
         <IconClipboard width={20} height={20} />
       </button>
 
@@ -59,7 +53,9 @@ export default function App() {
         <div className="sidebar-brand">
           <div className="brand-mark">LV</div>
           <div>
-            <p className="brand-name">{profile.orgName.split(" ").slice(0, 2).join(" ")}</p>
+            <p className="brand-name">
+              {profile.orgName ? profile.orgName.split(" ").slice(0, 2).join(" ") : "Dashboard"}
+            </p>
             <p className="brand-sub">Grant assistant</p>
           </div>
         </div>
