@@ -1,0 +1,157 @@
+.proposal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.proposal-card {
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.proposal-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.proposal-card-head h3 {
+  font-size: 16.5px;
+  margin: 0 0 4px;
+}
+
+.proposal-card-head p {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 14px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.status-ready {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.generating-block {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  background: var(--accent-soft);
+  padding: 14px 16px;
+  border-radius: 10px;
+  color: var(--accent-dark);
+}
+
+.generating-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.generating-sub {
+  font-size: 13px;
+  margin: 4px 0 0;
+  opacity: 0.9;
+}
+
+.proposal-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.download-menu-wrap {
+  position: relative;
+}
+
+.download-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.15);
+  padding: 6px;
+  z-index: 30;
+  min-width: 200px;
+}
+
+.download-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.download-menu button:hover {
+  background: var(--bg-card-soft);
+}
+
+.draft-meta {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  margin: 0 0 16px;
+}
+
+.draft-textarea {
+  width: 100%;
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-size: 13.5px;
+  line-height: 1.6;
+  padding: 16px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 10px;
+  resize: vertical;
+  color: var(--text-primary);
+  background: var(--bg-card-soft);
+}
+
+.draft-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.draft-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.draft-editor-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+@media (max-width: 880px) {
+  .proposal-grid {
+    grid-template-columns: 1fr;
+  }
+}

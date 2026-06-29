@@ -1,0 +1,98 @@
+.panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 26px 28px;
+}
+
+.panel-title {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0 0 18px;
+}
+
+.panel-desc {
+  font-size: 14.5px;
+  color: var(--text-secondary);
+  margin: -8px 0 16px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px 20px;
+}
+
+.focus-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.focus-group h4 {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin: 0 0 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.focus-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 15px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border-strong);
+  background: #fff;
+  color: var(--text-secondary);
+  font-size: 14.5px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.focus-chip:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.focus-chip-selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+  font-weight: 600;
+}
+
+.focus-count {
+  margin: 18px 0 0;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.save-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  padding-top: 6px;
+}
+
+.save-bar-hint {
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+@media (max-width: 880px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
