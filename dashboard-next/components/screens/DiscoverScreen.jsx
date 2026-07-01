@@ -7,17 +7,7 @@ import { GrantCard, SkeletonGrantCard } from "../GrantCard";
 import { IconSearch } from "../icons";
 
 export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSelectedIds, onFoundGrants, addToast, goProposals }) {
-  // 1. REFRESH SAFETY NET: Lazy initializer pulls cached data seamlessly out of sessionStorage
-  const [phase, setPhase] = useState(() => {
-    if (typeof window !== "undefined") {
-      const savedGrants = sessionStorage.getItem("discovered_grants");
-      if (savedGrants && JSON.parse(savedGrants).length > 0) {
-        return "done";
-      }
-    }
-    return grants.length ? "done" : "idle";
-  });
-  
+  const [phase, setPhase] = useState(grants.length ? "done" : "idle");
   const [progressMsg, setProgressMsg] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -25,28 +15,22 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
   const focusPreview = isExpanded ? focuses : focuses.slice(0, 4);
   const extraCount = Math.max(0, focuses.length - 4);
 
-  // 2. LIFECYCLE SYNC: Inflate state matching storage cache elements on mount
+  // grants/selectedIds hydration + sessionStorage sync now live in DashboardRoot,
+  // so a refresh on the proposals screen still has the raw grant data available.
+  // This screen just reacts to whatever grants it's handed.
   useEffect(() => {
-    if (typeof window !== "undefined" && grants.length === 0) {
-      const saved = sessionStorage.getItem("discovered_grants");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.length > 0) {
-          setGrants(parsed);
-        }
-      }
-    }
-  }, [grants.length, setGrants]);
+    setPhase(grants.length ? "done" : "idle");
+  }, [grants]);
 
   const runDiscovery = async () => {
     if (focuses.length === 0) {
       addToast("Add at least one focus area in your profile before searching.", "error");
       return;
     }
-    
+
     setPhase("searching");
     setProgressMsg("Connecting to Gemini engine...");
-    
+
     try {
       const response = await fetch("/api/discover", {
         method: "POST",
@@ -55,28 +39,19 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
       });
 
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed API fetch communication.");
-      }
+      if (!response.ok) throw new Error(data.error || "Failed API fetch communication.");
 
       setPhase("ranking");
       setProgressMsg("Sifting and scoring matches...");
-      
       await new Promise((resolve) => setTimeout(resolve, 600));
 
       const freshGrants = data.grants || [];
       setGrants(freshGrants);
-      
-      // 3. PERSIST ON SUCCESS: Safe tab-sandboxed runtime tracking
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("discovered_grants", JSON.stringify(freshGrants));
-      }
+      setSelectedIds([]);
 
       setPhase("done");
       onFoundGrants();
       addToast(`Found ${freshGrants.length} matching grants using AI discovery.`, "success");
-
     } catch (err) {
       console.error(err);
       setPhase("idle");
@@ -113,17 +88,13 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
                   No focus areas added yet
                 </span>
               ) : (
-                focusPreview.map((f) => (
-                  <span className="static-chip" key={f}>
-                    {f}
-                  </span>
-                ))
+                focusPreview.map((f) => <span className="static-chip" key={f}>{f}</span>)
               )}
-              
+
               {!isExpanded && extraCount > 0 && (
-                <button 
-                  type="button" 
-                  className="static-chip static-chip-muted text-button" 
+                <button
+                  type="button"
+                  className="static-chip static-chip-muted text-button"
                   onClick={() => setIsExpanded(true)}
                   style={{ cursor: "pointer", border: "none", background: "var(--bg-muted, #f3f4f6)" }}
                 >
@@ -132,9 +103,9 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
               )}
 
               {isExpanded && focuses.length > 4 && (
-                <button 
-                  type="button" 
-                  className="static-chip static-chip-muted text-button" 
+                <button
+                  type="button"
+                  className="static-chip static-chip-muted text-button"
                   onClick={() => setIsExpanded(false)}
                   style={{ cursor: "pointer", border: "none", background: "var(--bg-muted, #f3f4f6)", fontWeight: "600" }}
                 >
@@ -170,9 +141,7 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
 
       {(phase === "searching" || phase === "ranking") && (
         <div className="grant-list">
-          <SkeletonGrantCard />
-          <SkeletonGrantCard />
-          <SkeletonGrantCard />
+          <SkeletonGrantCard /><SkeletonGrantCard /><SkeletonGrantCard />
         </div>
       )}
 

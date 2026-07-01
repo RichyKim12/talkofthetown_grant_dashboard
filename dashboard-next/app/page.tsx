@@ -9,9 +9,8 @@ import { PaletteSwitcher } from "@/components/PaletteSwitcher";
 import { IconClipboard } from "@/components/icons";
 import { ProfileScreen } from "@/components/screens/ProfileScreen";
 import { DiscoverScreen } from "@/components/screens/DiscoverScreen";
-import { ProposalsScreen } from "@/components/screens/ProposalsScreen";
+import { ProposalsWorkspaceScreen } from "@/components/screens/ProposalsWorkspaceScreen";
 
-// 1. Defining the interface outside the component keeps the layout clean
 interface ProfileData {
   orgName: string;
   yearFounded: string;
@@ -26,11 +25,7 @@ interface ProfileData {
 export default function DashboardRoot() {
   const [paletteKey, setPaletteKey] = useState<keyof typeof PALETTES>("harvest");
   const [screen, setScreen] = useState("profile");
-  
-  // 2. Connected the interface to the state here:
   const [profile, setProfile] = useState<ProfileData | null>(null);
-  
-  // 3. Added basic typing to arrays/objects to prevent implicit 'any' warnings down the line
   const [grants, setGrants] = useState<any[]>([]);
   const [selectedIds, setSelectedIds] = useState<any[]>([]);
   const [drafts, setDrafts] = useState<Record<string, any>>({});
@@ -39,8 +34,32 @@ export default function DashboardRoot() {
   const [loading, setLoading] = useState(true);
 
   const { toasts, addToast, dismissToast } = useToasts();
-
   const palette = PALETTES[paletteKey];
+
+  // Hydrate grants + selected IDs from sessionStorage once, on mount.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const savedGrants = sessionStorage.getItem("discovered_grants");
+      if (savedGrants) {
+        const parsed = JSON.parse(savedGrants);
+        if (parsed.length > 0) setGrants(parsed);
+      }
+      const savedIds = sessionStorage.getItem("selected_grant_ids");
+      if (savedIds) setSelectedIds(JSON.parse(savedIds));
+    } catch {}
+  }, []);
+
+  // Keep sessionStorage in sync whenever grants or selectedIds change.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    sessionStorage.setItem("discovered_grants", JSON.stringify(grants));
+  }, [grants]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    sessionStorage.setItem("selected_grant_ids", JSON.stringify(selectedIds));
+  }, [selectedIds]);
 
   useEffect(() => {
     async function loadProfile() {
@@ -51,7 +70,6 @@ export default function DashboardRoot() {
         if (data.profile) {
           setProfile(data.profile);
         } else {
-          // Safe baseline layout fallback if database table row is empty
           setProfile({
             orgName: "",
             yearFounded: "",
@@ -69,7 +87,6 @@ export default function DashboardRoot() {
         setLoading(false);
       }
     }
-
     loadProfile();
   }, []);
 
@@ -82,13 +99,14 @@ export default function DashboardRoot() {
   );
 
   const markDone = (key: string) => setCompleted((prev) => new Set(prev).add(key));
-
   const selectedGrants = grants.filter((g: any) => selectedIds.includes(g.id));
 
   const goTo = (key: string) => {
     setScreen(key);
     setNavOpen(false);
   };
+
+  const isProposals = screen === "proposals";
 
   return (
     <div className="app-root" style={cssVars as React.CSSProperties}>
@@ -106,23 +124,32 @@ export default function DashboardRoot() {
         <div className="sidebar-brand">
           <div className="brand-mark">LV</div>
           <div>
-            <p className="brand-name">
-              {profile?.orgName || "Dashboard"}
-            </p>
+            <p className="brand-name">{profile?.orgName || "Dashboard"}</p>
             <p className="brand-sub">Grant assistant</p>
           </div>
         </div>
         <ProgressSteps current={screen} onJump={goTo} completed={completed} />
         <div className="sidebar-footer">
-          {/* Handing type-safe state modifiers downstream */}
-          <PaletteSwitcher 
-            paletteKey={paletteKey} 
-            setPaletteKey={setPaletteKey as any} 
-          />
+          <PaletteSwitcher paletteKey={paletteKey} setPaletteKey={setPaletteKey as any} />
         </div>
       </aside>
 
-      <main className="main-area">
+      {/* DYNAMIC HEIGHT, MAX-WIDTH, AND PADDING CONTROL */}
+      <main 
+        className="main-area" 
+        style={
+          isProposals 
+            ? { 
+                maxWidth: "none", 
+                width: "100%", 
+                height: "100vh", 
+                maxHeight: "100vh",
+                overflow: "hidden", 
+                padding: 0 // Eliminate conflicting parent paddings for workspace boundaries
+              } 
+            : undefined
+        }
+      >
         {screen === "profile" && (
           <ProfileScreen
             profile={profile}
@@ -151,13 +178,16 @@ export default function DashboardRoot() {
         )}
 
         {screen === "proposals" && (
-          <ProposalsScreen
+          <ProposalsWorkspaceScreen
             profile={profile}
             selectedGrants={selectedGrants}
             drafts={drafts}
             setDrafts={setDrafts}
             addToast={addToast}
             goDiscover={() => goTo("discover")}
+            onRemoveSelected={(grantId: string) =>
+              setSelectedIds((prev) => prev.filter((id) => id !== grantId))
+            }
           />
         )}
       </main>
