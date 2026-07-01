@@ -1,19 +1,42 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ScreenHeader, EmptyState } from "../Layout";
 import { ActionButton, Spinner } from "../ActionButton";
 import { GrantCard, SkeletonGrantCard } from "../GrantCard";
 import { IconSearch } from "../icons";
 
 export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSelectedIds, onFoundGrants, addToast, goProposals }) {
-  const [phase, setPhase] = useState(grants.length ? "done" : "idle"); // idle | searching | ranking | done
+  // 1. REFRESH SAFETY NET: Lazy initializer pulls cached data seamlessly out of sessionStorage
+  const [phase, setPhase] = useState(() => {
+    if (typeof window !== "undefined") {
+      const savedGrants = sessionStorage.getItem("discovered_grants");
+      if (savedGrants && JSON.parse(savedGrants).length > 0) {
+        return "done";
+      }
+    }
+    return grants.length ? "done" : "idle";
+  });
+  
   const [progressMsg, setProgressMsg] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
 
   const focuses = profile?.focuses || [];
   const focusPreview = isExpanded ? focuses : focuses.slice(0, 4);
   const extraCount = Math.max(0, focuses.length - 4);
+
+  // 2. LIFECYCLE SYNC: Inflate state matching storage cache elements on mount
+  useEffect(() => {
+    if (typeof window !== "undefined" && grants.length === 0) {
+      const saved = sessionStorage.getItem("discovered_grants");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.length > 0) {
+          setGrants(parsed);
+        }
+      }
+    }
+  }, [grants.length, setGrants]);
 
   const runDiscovery = async () => {
     if (focuses.length === 0) {
@@ -25,7 +48,6 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
     setProgressMsg("Connecting to Gemini engine...");
     
     try {
-      // Dispatch payload containing profile context straight to our internal route wrapper
       const response = await fetch("/api/discover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -41,13 +63,19 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
       setPhase("ranking");
       setProgressMsg("Sifting and scoring matches...");
       
-      // Artificial delay to make transition clean for users tracking the phase changes
       await new Promise((resolve) => setTimeout(resolve, 600));
 
-      setGrants(data.grants || []);
+      const freshGrants = data.grants || [];
+      setGrants(freshGrants);
+      
+      // 3. PERSIST ON SUCCESS: Safe tab-sandboxed runtime tracking
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("discovered_grants", JSON.stringify(freshGrants));
+      }
+
       setPhase("done");
       onFoundGrants();
-      addToast(`Found ${data.grants?.length || 0} matching grants using AI discovery.`, "success");
+      addToast(`Found ${freshGrants.length} matching grants using AI discovery.`, "success");
 
     } catch (err) {
       console.error(err);

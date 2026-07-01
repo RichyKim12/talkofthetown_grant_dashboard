@@ -19,6 +19,7 @@ export async function POST(request) {
     const today = new Date();
     const formattedToday = today.toISOString().split('T')[0]; // e.g., "2026-06-29"
 
+    // TODO, need a better prompt for grant sourcing. Grant filtering from past grants
     const prompt = `
       You are an expert grant discovery engine. Find the top 10 current, highly relevant public, private, or corporate grant sources available for the following organization:
       
@@ -35,6 +36,7 @@ export async function POST(request) {
       For each grant, explicitly provide an array of short strings in 'requirements' detailing the application criteria.
     `;
 
+    
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,

@@ -42,6 +42,8 @@ export async function POST(request) {
       [Highlight history, values, and reliability to successfully manage compliance constraints.]
     `;
 
+    console.log(prompt);
+
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,
