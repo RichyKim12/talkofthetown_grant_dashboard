@@ -296,7 +296,7 @@ export function ProposalsWorkspaceScreen({
         {tabs.map((g) => {
           const isActive = g.grant_id === activeId;
           const isDeleting = deletingId === g.grant_id;
-
+          
           // Combine clean structural classes for dynamic conditional styling
           let cardClasses = "workspace-card-btn";
           if (isActive) cardClasses += " active";
@@ -308,7 +308,10 @@ export function ProposalsWorkspaceScreen({
           return (
             <div key={`${type}-${g.grant_id}`} className="workspace-card-wrapper" style={{ opacity: isDeleting ? 0.5 : 1 }}>
               <button onClick={() => setActiveId(g.grant_id)} className={cardClasses}>
-                <span className="workspace-card-title">{g.grant_title}</span>
+                <span className="workspace-card-title">{g.grant_title} 
+                  grant id {g.grant_id}
+                  org id {g.org_id}
+                </span>
                 <div className="workspace-card-meta">
                   <span className="workspace-card-funder">{g.grant_funder}</span>
                   <span className="workspace-card-status-label">

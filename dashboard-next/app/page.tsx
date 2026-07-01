@@ -99,7 +99,7 @@ export default function DashboardRoot() {
   );
 
   const markDone = (key: string) => setCompleted((prev) => new Set(prev).add(key));
-  const selectedGrants = grants.filter((g: any) => selectedIds.includes(g.id));
+  const selectedGrants = grants.filter((g: any) => selectedIds.includes(g.id)) as any[];
 
   const goTo = (key: string) => {
     setScreen(key);

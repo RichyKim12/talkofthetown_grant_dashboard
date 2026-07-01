@@ -168,7 +168,6 @@ export async function DELETE(request) {
     const { error } = await supabase
       .from("proposals")
       .delete()
-      .eq("org_id", orgId)
       .eq("grant_id", grantId);
  
     if (error) throw error;
