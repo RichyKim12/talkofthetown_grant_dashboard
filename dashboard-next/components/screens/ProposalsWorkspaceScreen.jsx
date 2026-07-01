@@ -3,14 +3,16 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { ActionButton, Spinner } from "../ActionButton";
 import { IconCheck } from "../icons";
+import "../../styles/ProposalsWorkspaceScreen.css"; // Assumes styles.css is in the same directory
 
 export function ProposalsWorkspaceScreen({
   profile,
   selectedGrants = [],
   addToast,
   goDiscover,
-  onRemoveSelected, // (grantId) => void — removes a grant from the current selection, doesn't touch the DB
+  onRemoveSelected,
 }) {
+  const [activeTab, setActiveTab] = useState("selected"); // "selected" | "active" | "history"
   const [activeId, setActiveId] = useState(selectedGrants[0]?.id || null);
   const [draftTexts, setDraftTexts] = useState({});
   const [historicalProposals, setHistoricalProposals] = useState([]);
@@ -46,6 +48,30 @@ export function ProposalsWorkspaceScreen({
     };
   };
 
+  const { selectedTabs, activeTabs, historyTabs } = useMemo(() => {
+    const selectedList = [];
+    const activeList = [];
+    
+    selectedGrants.forEach((g) => {
+      const normalized = normalizeGrant(g);
+      if (draftTexts[normalized.grant_id]) {
+        activeList.push(normalized);
+      } else {
+        selectedList.push(normalized);
+      }
+    });
+
+    const historyList = historicalProposals
+      .filter((hp) => !rawGrantsById[hp.grant_id])
+      .map((p) => normalizeGrant(p));
+
+    return {
+      selectedTabs: selectedList,
+      activeTabs: activeList,
+      historyTabs: historyList,
+    };
+  }, [selectedGrants, draftTexts, historicalProposals, rawGrantsById]);
+
   useEffect(() => {
     async function loadWorkspaceAndHistory() {
       setIsLoading(true);
@@ -55,12 +81,10 @@ export function ProposalsWorkspaceScreen({
 
         if (res.ok && data.proposals) {
           setHistoricalProposals(data.proposals);
-
           const cloudDrafts = data.proposals.reduce((acc, row) => {
             acc[row.grant_id] = row.proposal_text;
             return acc;
           }, {});
-
           setDraftTexts(cloudDrafts);
         }
       } catch (err) {
@@ -123,10 +147,7 @@ export function ProposalsWorkspaceScreen({
       const res = await fetch("/api/proposals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          profile,
-          grant: targetGrant,
-        }),
+        body: JSON.stringify({ profile, grant: targetGrant }),
       });
 
       const data = await res.json();
@@ -139,7 +160,8 @@ export function ProposalsWorkspaceScreen({
         if (historyData.proposals) setHistoricalProposals(historyData.proposals);
 
         setSyncStatusById((prev) => ({ ...prev, [grantId]: "All changes saved to cloud" }));
-        addToast("Draft generated!", "success");
+        addToast("Draft generated! Moved to Active Workspace.", "success");
+        setActiveTab("active");
       } else {
         addToast(data.error || "Gemini generation failed.", "error");
       }
@@ -166,20 +188,15 @@ export function ProposalsWorkspaceScreen({
       });
       if (!res.ok) throw new Error();
 
-      // 1. Remove from local history state array
       setHistoricalProposals((prev) => prev.filter((p) => p.grant_id !== grantId));
-
-      // 2. Clear out the cached draft text
       setDraftTexts((prev) => {
         const next = { ...prev };
         delete next[grantId];
         return next;
       });
 
-      // 3. CRITICAL: Break the reference in the parent's selected list so it vanishes from all view arrays
       onRemoveSelected?.(grantId);
 
-      // 4. Reset active focus fallback safely
       if (activeId === grantId) {
         const remainingSelected = selectedGrants.filter((g) => g.id !== grantId);
         setActiveId(remainingSelected[0]?.id || null);
@@ -193,303 +210,217 @@ export function ProposalsWorkspaceScreen({
     }
   };
 
-  const [activeTab, setActiveTab] = useState("selected"); // "selected" | "history"
+  const downloadAsPDF = (grant) => {
+    const text = draftTexts[grant.grant_id] || "";
+    const printWindow = window.open("", "_blank");
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${grant.grant_title} - Proposal</title>
+          <style>
+            body { font-family: system-ui, sans-serif; padding: 40px; line-height: 1.6; color: #111827; }
+            h1 { margin-bottom: 5px; font-size: 24px; }
+            h2 { font-size: 14px; color: #6b7280; font-weight: normal; margin-top: 0; margin-bottom: 30px; }
+            p { white-space: pre-wrap; }
+          </style>
+        </head>
+        <body>
+          <h1>${grant.grant_title}</h1>
+          <h2>Funder: ${grant.grant_funder} ${grant.amount ? `| ${grant.amount}` : ""}</h2>
+          <hr />
+          <p>${text}</p>
+          <script>
+            window.onload = function() { window.print(); window.close(); }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
 
-  const selectedTabs = selectedGrants.map((g) => normalizeGrant(g));
-  const historyTabs = historicalProposals.map((p) => normalizeGrant(p));
+  const downloadAsDoc = (grant) => {
+    const text = draftTexts[grant.grant_id] || "";
+    const htmlContent = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head><title>${grant.grant_title}</title><style>body { font-family: Arial; line-height: 1.5; }</style></head>
+      <body>
+        <h2>${grant.grant_title}</h2>
+        <p><b>Funder:</b> ${grant.grant_funder}</p>
+        <hr/>
+        <p style="white-space: pre-wrap;">${text}</p>
+      </body>
+      </html>
+    `;
+    
+    const blob = new Blob(['\ufeff' + htmlContent], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${grant.grant_title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_proposal.doc`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
-  const allKnownTabs = [...selectedTabs, ...historyTabs];
-  const activeGrant =
-    allKnownTabs.find((g) => g.grant_id === activeId) || allKnownTabs[0] || null;
+  const allKnownTabs = [...selectedTabs, ...activeTabs, ...historyTabs];
+  const activeGrant = allKnownTabs.find((g) => g.grant_id === activeId) || allKnownTabs[0] || null;
   const activeRawGrant = activeGrant ? rawGrantsById[activeGrant.grant_id] : null;
   const hasDraftContent = activeId && draftTexts[activeId] !== undefined;
   const activeSyncStatus = (activeId && syncStatusById[activeId]) || "All changes saved to cloud";
   const isComposingActive = composingId === activeId;
+  const isDownloadable = hasDraftContent && (activeTab === "active" || activeTab === "history");
 
   if (isLoading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh" }}>
-        <div style={{ textAlign: "center" }}>
+      <div className="workspace-loading-container">
+        <div className="workspace-loading-wrapper">
           <Spinner size={24} />
-          <p style={{ marginTop: "1rem", color: "#6b7280" }}>Loading Workspace Records...</p>
+          <p className="workspace-loading-text">Loading Workspace Records...</p>
         </div>
       </div>
     );
   }
 
+  const renderTabItems = (tabs, type) => {
+    if (tabs.length === 0) {
+      return (
+        <div className="workspace-empty-state">
+          No {type} items available.
+        </div>
+      );
+    }
+
+    return (
+      <div className="workspace-card-list">
+        {tabs.map((g) => {
+          const isActive = g.grant_id === activeId;
+          const isDeleting = deletingId === g.grant_id;
+
+          // Combine clean structural classes for dynamic conditional styling
+          let cardClasses = "workspace-card-btn";
+          if (isActive) cardClasses += " active";
+          if (type === "history") cardClasses += " history-bg";
+
+          let closeBtnClasses = "workspace-card-close-btn";
+          if (type === "history") closeBtnClasses += " history-delete";
+
+          return (
+            <div key={`${type}-${g.grant_id}`} className="workspace-card-wrapper" style={{ opacity: isDeleting ? 0.5 : 1 }}>
+              <button onClick={() => setActiveId(g.grant_id)} className={cardClasses}>
+                <span className="workspace-card-title">{g.grant_title}</span>
+                <div className="workspace-card-meta">
+                  <span className="workspace-card-funder">{g.grant_funder}</span>
+                  <span className="workspace-card-status-label">
+                    {type === "selected" ? "Empty Shell" : "Active Draft"}
+                  </span>
+                </div>
+              </button>
+              
+              <button
+                onClick={() => type === "history" ? handleDeleteFromHistory(g.grant_id) : handleRemoveSelected(g.grant_id)}
+                disabled={isDeleting}
+                title={type === "history" ? "Delete permanently" : "Remove from workspace"}
+                className={closeBtnClasses}
+                style={{ cursor: isDeleting ? "default" : "pointer" }}
+              >
+                ×
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        width: "100%",
-        maxWidth: "none",
-        flex: "1 1 auto",
-        alignSelf: "stretch",
-        fontFamily: "inherit",
-        overflow: "hidden",
-        boxSizing: "border-box",
-      }}
-    >
-      <div style={{ padding: "2rem 2rem 1rem 2rem", flexShrink: 0 }}>
-        <h1 style={{ fontSize: "1.75rem", fontWeight: "800", margin: "0 0 0.5rem 0", color: "#000" }}>Proposals Workbench</h1>
-        <p style={{ margin: 0, color: "#374151", fontSize: "0.95rem" }}>
+    <div className="workspace-main-container">
+      {/* Header Panel */}
+      <div className="workspace-header-panel">
+        <h1 className="workspace-header-title">Proposals Workbench</h1>
+        <p className="workspace-header-subtitle">
           Review, edit, and export your active proposal applications side-by-side.
         </p>
       </div>
 
-      <div style={{ display: "flex", gap: "2rem", flex: 1, minHeight: 0, padding: "0 2rem 2rem 2rem", width: "100%", boxSizing: "border-box" }}>
-        {/* LEFT COLUMN — scrolls independently */}
-        <div
-          style={{
-            width: "320px",
-            flexShrink: 0,
-            display: "flex",
-            flexDirection: "column",
-            minHeight: 0,
-          }}
-        >
-          <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0, marginBottom: "1rem", borderBottom: "1px solid #e5e7eb" }}>
+      {/* Workspace Split Layout */}
+      <div className="workspace-body-split">
+        {/* LEFT COLUMN — Tabbed List */}
+        <div className="workspace-sidebar-column">
+          <div className="workspace-tab-headers">
             <button
               onClick={() => setActiveTab("selected")}
-              style={{
-                padding: "0.6rem 0.25rem",
-                background: "none",
-                border: "none",
-                borderBottom: activeTab === "selected" ? "2px solid #9a3412" : "2px solid transparent",
-                color: activeTab === "selected" ? "#000" : "#6b7280",
-                fontWeight: activeTab === "selected" ? "700" : "500",
-                fontSize: "0.9rem",
-                cursor: "pointer",
-                marginRight: "1.25rem",
-              }}
+              className={`workspace-tab-btn ${activeTab === "selected" ? "active" : ""}`}
             >
               Selected ({selectedTabs.length})
             </button>
             <button
+              onClick={() => setActiveTab("active")}
+              className={`workspace-tab-btn ${activeTab === "active" ? "active" : ""}`}
+            >
+              Active ({activeTabs.length})
+            </button>
+            <button
               onClick={() => setActiveTab("history")}
-              style={{
-                padding: "0.6rem 0.25rem",
-                background: "none",
-                border: "none",
-                borderBottom: activeTab === "history" ? "2px solid #9a3412" : "2px solid transparent",
-                color: activeTab === "history" ? "#000" : "#6b7280",
-                fontWeight: activeTab === "history" ? "700" : "500",
-                fontSize: "0.9rem",
-                cursor: "pointer",
-              }}
+              className={`workspace-tab-btn ${activeTab === "history" ? "active" : ""}`}
             >
               History ({historyTabs.length})
             </button>
           </div>
 
-          <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: "1rem", paddingRight: "0.25rem" }}>
-            {activeTab === "selected" && (
-              <div>
-                {selectedTabs.length === 0 ? (
-                  <div style={{ padding: "1rem", color: "#9ca3af", fontSize: "0.9rem", fontStyle: "italic" }}>
-                    No items selected.
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                    {selectedTabs.map((g) => {
-                      const isActive = g.grant_id === activeId;
-                      const isSavedInDB = !!draftTexts[g.grant_id];
-
-                      return (
-                        <div key={`sel-${g.grant_id}`} style={{ position: "relative" }}>
-                          <button
-                            onClick={() => setActiveId(g.grant_id)}
-                            style={{
-                              width: "100%",
-                              padding: "1.25rem 2.25rem 1.25rem 1rem",
-                              borderRadius: "8px",
-                              textAlign: "left",
-                              border: isActive ? "2px solid #9a3412" : "1px solid #e5e7eb",
-                              backgroundColor: "#fff",
-                              cursor: "pointer",
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: "0.5rem",
-                              boxShadow: isActive ? "none" : "0 1px 2px rgba(0,0,0,0.05)",
-                            }}
-                          >
-                            <span style={{ fontWeight: "700", fontSize: "0.95rem", color: "#000", lineHeight: "1.3" }}>
-                              {g.grant_title}
-                            </span>
-                            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.8rem", color: "#6b7280" }}>
-                              <span style={{ color: "#4b5563" }}>{g.grant_funder}</span>
-                              <span style={{ color: "#a1a1aa" }}>{isSavedInDB ? "Saved Draft" : "Empty Shell"}</span>
-                            </div>
-                          </button>
-                          <button
-                            onClick={() => handleRemoveSelected(g.grant_id)}
-                            title="Remove from selection"
-                            style={{
-                              position: "absolute",
-                              top: "0.6rem",
-                              right: "0.6rem",
-                              width: "22px",
-                              height: "22px",
-                              borderRadius: "50%",
-                              border: "none",
-                              background: "#f3f4f6",
-                              color: "#6b7280",
-                              cursor: "pointer",
-                              fontSize: "0.85rem",
-                              lineHeight: 1,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === "history" && (
-              <div>
-                {historyTabs.length === 0 ? (
-                  <div style={{ padding: "1rem", color: "#9ca3af", fontSize: "0.9rem", fontStyle: "italic" }}>
-                    No saved proposals yet.
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                    {historyTabs.map((g) => {
-                      const isActive = g.grant_id === activeId;
-                      const isDeleting = deletingId === g.grant_id;
-
-                      return (
-                        <div key={`hist-${g.grant_id}`} style={{ position: "relative", opacity: isDeleting ? 0.5 : 1 }}>
-                          <button
-                            onClick={() => setActiveId(g.grant_id)}
-                            style={{
-                              width: "100%",
-                              padding: "1.25rem 2.25rem 1.25rem 1rem",
-                              borderRadius: "8px",
-                              textAlign: "left",
-                              border: isActive ? "2px solid #9a3412" : "1px solid #e5e7eb",
-                              backgroundColor: "#fafafa",
-                              cursor: "pointer",
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: "0.5rem",
-                            }}
-                          >
-                            <span style={{ fontWeight: "700", fontSize: "0.95rem", color: "#000", lineHeight: "1.3" }}>
-                              {g.grant_title}
-                            </span>
-                            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.8rem", color: "#6b7280" }}>
-                              <span style={{ color: "#4b5563" }}>{g.grant_funder}</span>
-                              <span style={{ color: "#a1a1aa" }}>Saved Draft</span>
-                            </div>
-                          </button>
-                          <button
-                            onClick={() => handleDeleteFromHistory(g.grant_id)}
-                            disabled={isDeleting}
-                            title="Delete permanently"
-                            style={{
-                              position: "absolute",
-                              top: "0.6rem",
-                              right: "0.6rem",
-                              width: "22px",
-                              height: "22px",
-                              borderRadius: "50%",
-                              border: "none",
-                              background: "#fee2e2",
-                              color: "#b91c1c",
-                              cursor: isDeleting ? "default" : "pointer",
-                              fontSize: "0.85rem",
-                              lineHeight: 1,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
+          <div className="workspace-sidebar-scroll">
+            {activeTab === "selected" && renderTabItems(selectedTabs, "selected")}
+            {activeTab === "active" && renderTabItems(activeTabs, "active")}
+            {activeTab === "history" && renderTabItems(historyTabs, "history")}
           </div>
         </div>
 
-        {/* RIGHT COLUMN — fills remaining width, internal scroll only in the textarea */}
-        <div
-          style={{
-            flex: "1 1 auto",
-            minWidth: 0,
-            background: "#fff",
-            border: "1px solid #f3f4f6",
-            borderRadius: "8px",
-            display: "flex",
-            flexDirection: "column",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
-            minHeight: 0,
-          }}
-        >
+        {/* RIGHT COLUMN — Content Canvas */}
+        <div className="workspace-content-column">
           {activeGrant ? (
-            <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "1.5rem", borderBottom: "1px solid #f3f4f6", flexShrink: 0 }}>
+            <div className="workspace-canvas-layout">
+              <div className="workspace-canvas-meta-bar">
                 <div>
-                  <h3 style={{ margin: "0 0 0.35rem 0", fontSize: "1.1rem", fontWeight: "700", color: "#000", maxWidth: "500px", lineHeight: "1.3" }}>
-                    {activeGrant.grant_title}
-                  </h3>
-                  <span style={{ fontSize: "0.85rem", color: "#9ca3af" }}>
+                  <h3 className="workspace-canvas-title">{activeGrant.grant_title}</h3>
+                  <span className="workspace-canvas-submeta">
                     Funder: {activeGrant.grant_funder}
                     {activeGrant.amount ? ` · ${activeGrant.amount}` : ""}
                   </span>
                 </div>
-                <div style={{ fontStyle: "italic", fontSize: "0.85rem", color: "#059669", fontWeight: "500", textAlign: "right", flexShrink: 0 }}>
-                  {activeSyncStatus === "All changes saved to cloud" ? (
-                    <>All changes saved<br />to cloud</>
-                  ) : (
-                    activeSyncStatus
+                
+                <div className="workspace-canvas-right-actions">
+                  {isDownloadable && (
+                    <div className="workspace-download-group">
+                      <button onClick={() => downloadAsPDF(activeGrant)} className="workspace-download-btn">PDF</button>
+                      <button onClick={() => downloadAsDoc(activeGrant)} className="workspace-download-btn">DOC</button>
+                    </div>
                   )}
+
+                  <div className="workspace-sync-display">
+                    {activeSyncStatus === "All changes saved to cloud" ? (
+                      <>All changes saved<br />to cloud</>
+                    ) : (
+                      activeSyncStatus
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div style={{ padding: "1.5rem", flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+              <div className="workspace-canvas-body">
                 {hasDraftContent ? (
                   <textarea
                     value={draftTexts[activeId] || ""}
                     onChange={(e) => handleTextUpdate(e.target.value, activeRawGrant || activeGrant)}
-                    style={{
-                      flex: 1,
-                      width: "100%",
-                      padding: "1rem",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "6px",
-                      resize: "none",
-                      outline: "none",
-                      fontSize: "0.95rem",
-                      lineHeight: "1.6",
-                      color: "#111827",
-                      backgroundColor: "#ffffff",
-                      overflowY: "auto",
-                    }}
+                    className="workspace-textarea"
                     placeholder="Start typing your response proposal copy..."
                   />
                 ) : (
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, textAlign: "center", margin: "auto" }}>
+                  <div className="workspace-centered-prompt">
                     {!activeRawGrant ? (
                       <>
-                        <h4 style={{ margin: "0 0 0.75rem 0", fontSize: "1.05rem", fontWeight: "700", color: "#000" }}>
-                          Original grant data unavailable
-                        </h4>
-                        <p style={{ color: "#9ca3af", fontSize: "0.85rem", maxWidth: "380px", margin: "0 0 2rem 0", lineHeight: "1.5" }}>
-                          This grant came from a previous session and its full details weren't carried over, so a draft can't be generated. Return to Discover and re-select it, or start a new search.
+                        <h4 className="workspace-prompt-headline">Original grant data unavailable</h4>
+                        <p className="workspace-prompt-p">
+                          This grant came from a previous session and its full details weren't carried over.
                         </p>
                         <ActionButton onPress={goDiscover} variant="secondary">
                           Back to Discover
@@ -497,11 +428,9 @@ export function ProposalsWorkspaceScreen({
                       </>
                     ) : (
                       <>
-                        <h4 style={{ margin: "0 0 0.75rem 0", fontSize: "1.05rem", fontWeight: "700", color: "#000" }}>
-                          Draft Proposal Content Missing
-                        </h4>
-                        <p style={{ color: "#9ca3af", fontSize: "0.85rem", maxWidth: "380px", margin: "0 0 2rem 0", lineHeight: "1.5" }}>
-                          You haven't requested a Gemini composition matrix copy for this specific grant opportunity pipeline yet.
+                        <h4 className="workspace-prompt-headline">Draft Proposal Content Missing</h4>
+                        <p className="workspace-prompt-p">
+                          You haven't requested an AI composition for this specific grant opportunity yet.
                         </p>
                         <ActionButton
                           onPress={() => handleComposeFirstDraft(activeRawGrant)}
@@ -517,8 +446,8 @@ export function ProposalsWorkspaceScreen({
               </div>
             </div>
           ) : (
-            <div style={{ color: "#9ca3af", textAlign: "center", margin: "auto", padding: "3rem" }}>
-              Select an active application from the sidebar to begin, or discover new grants.
+            <div className="workspace-unselected-placeholder">
+              Select an application from the sidebar tabs to begin.
             </div>
           )}
         </div>
