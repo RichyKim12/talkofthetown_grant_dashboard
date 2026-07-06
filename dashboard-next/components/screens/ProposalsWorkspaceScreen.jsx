@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { ActionButton, Spinner } from "../ActionButton";
 import { IconCheck } from "../icons";
-import "../../styles/ProposalsWorkspaceScreen.css"; // Assumes styles.css is in the same directory
+import "../../styles/ProposalsWorkspaceScreen.css"; 
 
 export function ProposalsWorkspaceScreen({
   profile,
@@ -12,7 +12,7 @@ export function ProposalsWorkspaceScreen({
   goDiscover,
   onRemoveSelected,
 }) {
-  const [activeTab, setActiveTab] = useState("selected"); // "selected" | "active" | "history"
+  const [activeTab, setActiveTab] = useState("selected"); 
   const [activeId, setActiveId] = useState(selectedGrants[0]?.id || null);
   const [draftTexts, setDraftTexts] = useState({});
   const [historicalProposals, setHistoricalProposals] = useState([]);
@@ -20,6 +20,10 @@ export function ProposalsWorkspaceScreen({
   const [isLoading, setIsLoading] = useState(true);
   const [composingId, setComposingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  
+  // Conversational Refinement State Variables
+  const [chatInput, setChatInput] = useState("");
+  const [isIterating, setIsIterating] = useState(false);
 
   const debounceTimersRef = useRef({});
 
@@ -172,6 +176,43 @@ export function ProposalsWorkspaceScreen({
     }
   };
 
+  // Iterates over the selected draft using real-time instructions
+  const handleIterateDraft = async (targetGrant) => {
+    if (!chatInput.trim() || !activeId) return;
+    setIsIterating(true);
+    setSyncStatusById((prev) => ({ ...prev, [activeId]: "Refining with Gemini..." }));
+
+    try {
+      const res = await fetch("/api/proposals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profile,
+          grant: targetGrant,
+          action: "iterate",
+          currentDraft: draftTexts[activeId],
+          instruction: chatInput,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.data?.proposal_text) {
+        setDraftTexts((prev) => ({ ...prev, [activeId]: data.data.proposal_text }));
+        setSyncStatusById((prev) => ({ ...prev, [activeId]: "All changes saved to cloud" }));
+        addToast("Draft successfully refined by Gemini!", "success");
+        setChatInput(""); 
+      } else {
+        addToast(data.error || "Refinement iteration failed.", "error");
+        setSyncStatusById((prev) => ({ ...prev, [activeId]: "All changes saved to cloud" }));
+      }
+    } catch (err) {
+      addToast("Network or logic execution error during iteration.", "error");
+    } finally {
+      setIsIterating(false);
+    }
+  };
+
   const handleRemoveSelected = (grantId) => {
     if (activeId === grantId) {
       const remaining = selectedGrants.filter((g) => g.id !== grantId);
@@ -297,7 +338,6 @@ export function ProposalsWorkspaceScreen({
           const isActive = g.grant_id === activeId;
           const isDeleting = deletingId === g.grant_id;
           
-          // Combine clean structural classes for dynamic conditional styling
           let cardClasses = "workspace-card-btn";
           if (isActive) cardClasses += " active";
           if (type === "history") cardClasses += " history-bg";
@@ -308,10 +348,7 @@ export function ProposalsWorkspaceScreen({
           return (
             <div key={`${type}-${g.grant_id}`} className="workspace-card-wrapper" style={{ opacity: isDeleting ? 0.5 : 1 }}>
               <button onClick={() => setActiveId(g.grant_id)} className={cardClasses}>
-                <span className="workspace-card-title">{g.grant_title} 
-                  grant id {g.grant_id}
-                  org id {g.org_id}
-                </span>
+                <span className="workspace-card-title">{g.grant_title}</span>
                 <div className="workspace-card-meta">
                   <span className="workspace-card-funder">{g.grant_funder}</span>
                   <span className="workspace-card-status-label">
@@ -411,12 +448,52 @@ export function ProposalsWorkspaceScreen({
 
               <div className="workspace-canvas-body">
                 {hasDraftContent ? (
-                  <textarea
-                    value={draftTexts[activeId] || ""}
-                    onChange={(e) => handleTextUpdate(e.target.value, activeRawGrant || activeGrant)}
-                    className="workspace-textarea"
-                    placeholder="Start typing your response proposal copy..."
-                  />
+                  <div className="workspace-editor-chat-wrapper">
+                    <div className="workspace-textarea-container">
+                      <textarea
+                        value={draftTexts[activeId] || ""}
+                        onChange={(e) => handleTextUpdate(e.target.value, activeRawGrant || activeGrant)}
+                        className="workspace-textarea"
+                        placeholder="Start typing your response proposal copy..."
+                        disabled={isIterating}
+                      />
+                      
+                      {/* Active Prompt Overlay Layout */}
+                      {isIterating && (
+                        <div className="workspace-editor-overlay">
+                          <div className="workspace-overlay-card">
+                            <Spinner size={28} />
+                            <p className="workspace-overlay-text">Gemini is revising your draft...</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* INLINE ITERATION CHAT BAR */}
+                    <div className="workspace-chat-bar">
+                      <input
+                        type="text"
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        placeholder="Ask Gemini to refine this draft (e.g., 'Make the executive summary more formal')..."
+                        className="workspace-chat-input"
+                        disabled={isIterating}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleIterateDraft(activeRawGrant || activeGrant);
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={() => handleIterateDraft(activeRawGrant || activeGrant)}
+                        disabled={isIterating || !chatInput.trim()}
+                        className="workspace-chat-send-btn"
+                      >
+                        {isIterating ? "Refining..." : "Refine Draft"}
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <div className="workspace-centered-prompt">
                     {!activeRawGrant ? (

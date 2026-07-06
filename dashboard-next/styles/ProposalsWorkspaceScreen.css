@@ -170,7 +170,7 @@
   line-height: 1;
   display: flex;
   align-items: center;
-  justifyContent: center;
+  justify-content: center;
   background: #f3f4f6;
   color: #6b7280;
   cursor: pointer;
@@ -263,6 +263,23 @@
   min-height: 0;
 }
 
+/* Editor & AI Refinement Chat Layout */
+.workspace-editor-chat-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 1rem;
+}
+
+.workspace-textarea-container {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .workspace-textarea {
   flex: 1;
   width: 100%;
@@ -276,6 +293,106 @@
   color: #111827;
   background-color: #ffffff;
   overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.workspace-textarea:disabled {
+  background-color: #fcfcfc;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+/* Overlay Interface Styles */
+.workspace-editor-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  z-index: 10;
+  animation: fadeInWorkspaceOverlay 0.2s ease-in-out;
+}
+
+.workspace-overlay-card {
+  background-color: #ffffff;
+  padding: 1.5rem 2rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.workspace-overlay-text {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.workspace-chat-bar {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background-color: #fafafa;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.workspace-chat-input {
+  flex: 1;
+  padding: 0.65rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  outline: none;
+  background-color: #ffffff;
+  color: #111827;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+}
+
+.workspace-chat-input:focus {
+  border-color: #9a3412;
+}
+
+.workspace-chat-input:disabled {
+  background-color: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.workspace-chat-send-btn {
+  padding: 0.65rem 1.25rem;
+  background-color: #9a3412;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease;
+}
+
+.workspace-chat-send-btn:hover:not(:disabled) {
+  background-color: #7c2d12;
+}
+
+.workspace-chat-send-btn:disabled {
+  background-color: #e5e7eb;
+  color: #9ca3af;
+  cursor: not-allowed;
 }
 
 /* Centered & Empty Canvas States */
@@ -309,4 +426,9 @@
   text-align: center;
   margin: auto;
   padding: 3rem;
+}
+
+@keyframes fadeInWorkspaceOverlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }

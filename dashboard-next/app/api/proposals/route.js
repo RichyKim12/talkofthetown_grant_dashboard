@@ -1,4 +1,3 @@
-// app/api/proposals/route.js
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
@@ -29,10 +28,11 @@ export async function GET(req) {
   }
 }
 
-// 2. GENERATE + PERSIST — calls Gemini, then saves the result to Supabase
+// 2. GENERATE + PERSIST + ITERATE — calls Gemini, then saves the result to Supabase
 export async function POST(request) {
   try {
-    const { profile, grant } = await request.json();
+    const body = await request.json();
+    const { profile, grant, action, currentDraft, instruction } = body;
 
     if (!profile || !grant) {
       return NextResponse.json(
@@ -41,35 +41,60 @@ export async function POST(request) {
       );
     }
 
-    const prompt = `
-      You are an expert executive grant writer. Write a comprehensive, persuasive, and highly professional first-draft grant proposal for ${profile.orgName} applying for the "${grant.title || grant.name}" issued by ${grant.source || grant.funder}.
+    let prompt = "";
 
-      --- ORGANIZATION CONTEXT ---
-      Mission & Values: ${profile.mission || "Not specified"}
-      Core Competencies/Focuses: ${profile.focuses?.join(", ") || "General community service"}
-      Geographic Region Served: ${profile.serviceArea || "General / Unrestricted"}
+    if (action === "iterate") {
+      if (!instruction || !currentDraft) {
+        return NextResponse.json(
+          { error: "Missing current draft or iteration instructions." },
+          { status: 400 }
+        );
+      }
 
-      --- GRANT DETAILS ---
-      Funding Bracket Target: $${grant.amountMin?.toLocaleString()} - $${grant.amountMax?.toLocaleString()}
-      Identified Matching Overlaps: ${grant.matchedFocuses?.join(", ") || "General Alignment"}
-      Prerequisite Requirements: ${grant.requirements?.join(", ") || "Standard compliance"}
+      prompt = `
+        You are an expert executive grant writer. You are refining an existing proposal draft based on feedback.
+        
+        --- CURRENT DRAFT ---
+        ${currentDraft}
 
-      --- PROPOSAL FORMATTING STRUCTURE ---
-      Please format the response text cleanly using professional markdown sections:
-      # Grant Proposal Draft: ${grant.title || grant.name}
+        --- REVISION INSTRUCTION FROM THE USER ---
+        "${instruction}"
 
-      ## 1. Executive Summary
-      [Provide a compelling 2-3 sentence overview of why this partnership creates systemic impact.]
+        --- TASK ---
+        Rewrite the draft proposal incorporating the revision instruction. Maintain the existing tone and structural markdown format (# Grant Proposal Draft, ## 1. Executive Summary, etc.) unless explicitly instructed to change the layout. Return ONLY the updated full markdown draft text.
+      `;
+    } else {
+      // Original Generation Prompt
+      prompt = `
+        You are an expert executive grant writer. Write a comprehensive, persuasive, and highly professional first-draft grant proposal for ${profile.orgName} applying for the "${grant.title || grant.name}" issued by ${grant.source || grant.funder}.
 
-      ## 2. Statement of Need & Alignment
-      [Detail how the organization's focus areas directly solve the core mission of the grant issuer.]
+        --- ORGANIZATION CONTEXT ---
+        Mission & Values: ${profile.mission || "Not specified"}
+        Core Competencies/Focuses: ${profile.focuses?.join(", ") || "General community service"}
+        Geographic Region Served: ${profile.serviceArea || "General / Unrestricted"}
 
-      ## 3. Project Narrative & Execution Plan
-      [A structured strategy on how the funding allocation will be maximized.]
+        --- GRANT DETAILS ---
+        Funding Bracket Target: $${grant.amountMin?.toLocaleString()} - $${grant.amountMax?.toLocaleString()}
+        Identified Matching Overlaps: ${grant.matchedFocuses?.join(", ") || "General Alignment"}
+        Prerequisite Requirements: ${grant.requirements?.join(", ") || "Standard compliance"}
 
-      ## 4. Organizational Qualifications
-      [Highlight history, values, and reliability to successfully manage compliance constraints.]
-    `;
+        --- PROPOSAL FORMATTING STRUCTURE ---
+        Please format the response text cleanly using professional markdown sections:
+        # Grant Proposal Draft: ${grant.title || grant.name}
+
+        ## 1. Executive Summary
+        [Provide a compelling 2-3 sentence overview of why this partnership creates systemic impact.]
+
+        ## 2. Statement of Need & Alignment
+        [Detail how the organization's focus areas directly solve the core mission of the grant issuer.]
+
+        ## 3. Project Narrative & Execution Plan
+        [A structured strategy on how the funding allocation will be maximized.]
+
+        ## 4. Organizational Qualifications
+        [Highlight history, values, and reliability to successfully manage compliance constraints.]
+      `;
+    }
 
     const geminiResponse = await ai.models.generateContent({
       model: "gemini-2.5-flash",
@@ -80,7 +105,7 @@ export async function POST(request) {
 
     if (!proposalText || !proposalText.trim()) {
       return NextResponse.json(
-        { error: "Gemini returned an empty draft." },
+        { error: "Gemini returned an empty response." },
         { status: 502 }
       );
     }
@@ -109,15 +134,15 @@ export async function POST(request) {
 
     return NextResponse.json({ success: true, data }, { status: 200 });
   } catch (error) {
-    console.error("Gemini Proposal Generation Engine Failure:", error);
+    console.error("Gemini Proposal Engine Failure:", error);
     return NextResponse.json(
-      { error: "Internal proposal drafting execution failed." },
+      { error: "Internal proposal execution failed." },
       { status: 500 }
     );
   }
 }
 
-// Add to app/api/proposals/route.js — plain save, no Gemini call
+// 3. PLAIN SAVE — simple save, no Gemini call
 export async function PATCH(request) {
   try {
     const { grantId, grantTitle, grantFunder, proposalText, status } = await request.json();
@@ -154,24 +179,23 @@ export async function PATCH(request) {
   }
 }
 
+// 4. HARD DELETE — permanently removes record
 export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
     const grantId = searchParams.get("grantId");
- 
+
     if (!grantId) {
       return NextResponse.json({ error: "Missing grantId." }, { status: 400 });
     }
- 
-    const orgId = 1;
- 
+
     const { error } = await supabase
       .from("proposals")
       .delete()
       .eq("grant_id", grantId);
- 
+
     if (error) throw error;
- 
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Delete failure:", error);
