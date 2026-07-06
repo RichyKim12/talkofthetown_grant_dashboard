@@ -27,7 +27,6 @@ export default function DashboardRoot() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [grants, setGrants] = useState<any[]>([]);
   const [selectedIds, setSelectedIds] = useState<any[]>([]);
-  const [drafts, setDrafts] = useState<Record<string, any>>({});
   const [completed, setCompleted] = useState<Set<string>>(new Set());
   const [navOpen, setNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -233,8 +232,6 @@ export default function DashboardRoot() {
           <ProposalsWorkspaceScreen
             profile={profile}
             selectedGrants={selectedGrants as never[]}
-            drafts={drafts}
-            setDrafts={setDrafts}
             addToast={addToast}
             goDiscover={() => goTo("discover")}
             onRemoveSelected={(grantId: string) =>
