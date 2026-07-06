@@ -69,7 +69,7 @@ export async function POST(request) {
         // --- DETERMINISTIC TUNING PARAMETERS ---
         temperature: 0.1,    // Forces factual, predictable token choices instead of creative ones
         topP: 0.2,           // Limits the token selection pool to only the most confident options
-        maxOutputTokens: 2048,
+        maxOutputTokens: 8192,
 
         responseMimeType: "application/json",
         responseSchema: {
