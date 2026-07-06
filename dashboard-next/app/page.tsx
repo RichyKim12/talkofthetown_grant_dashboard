@@ -232,7 +232,7 @@ export default function DashboardRoot() {
         {screen === "proposals" && (
           <ProposalsWorkspaceScreen
             profile={profile}
-            selectedGrants={selectedGrants}
+            selectedGrants={selectedGrants as never[]}
             drafts={drafts}
             setDrafts={setDrafts}
             addToast={addToast}
