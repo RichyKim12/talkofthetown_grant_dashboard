@@ -37,7 +37,7 @@ export function ProposalsWorkspaceScreen({
 
   const normalizeGrant = (g) => {
     if (!g) return null;
-    const grantId = g.id || g.grant_id;
+    const grantId = g.grant_id || g.id;
     const amount =
       g.amountMin != null && g.amountMax != null
         ? `$${g.amountMin.toLocaleString()}–$${g.amountMax.toLocaleString()}`

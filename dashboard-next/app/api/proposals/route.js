@@ -184,7 +184,7 @@ export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
     const grantId = searchParams.get("grantId");
-
+    console.log(grantId);
     if (!grantId) {
       return NextResponse.json({ error: "Missing grantId." }, { status: 400 });
     }

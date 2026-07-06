@@ -1,0 +1,1 @@
+Should active drafts be moved to history when session closes or stays as active?
