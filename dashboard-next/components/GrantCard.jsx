@@ -3,13 +3,6 @@ import { IconClock, IconCheck, IconChevronDown } from "./icons";
 import { formatDate, daysUntil } from "../utils/formatters";
 import "../styles/GrantCard.css";
 
-/* ============================================================
-   GRANT CARD
-   Used in the merged Discover & select screen. Selection is
-   built in (not a separate screen) — the checkbox at the
-   bottom is how the user builds their shortlist as they browse.
-   ============================================================ */
-
 export function ScoreBadge({ score }) {
   const tier = score >= 90 ? "high" : score >= 75 ? "mid" : "low";
   return (
@@ -24,33 +17,70 @@ export function GrantCard({ grant, rank, selected, onToggleSelect }) {
   const [expanded, setExpanded] = useState(false);
   const daysLeft = daysUntil(grant.deadline);
 
+  // Safe fallback URL handler
+  const destinationUrl = grant.sourceUrl || "#";
+
   return (
     <div className={`grant-card${selected ? " grant-card-selected" : ""}`}>
+      {/* 1. Left Column: Keeps the existing layout structural balance intact */}
       <div className="grant-rank">#{rank}</div>
+      
+      {/* 2. Right Column */}
       <div className="grant-card-main">
         <div className="grant-card-top">
           <div>
-            <h3 className="grant-name">{grant.name}</h3>
-            <p className="grant-funder">{grant.funder}</p>
+            <h3 className="grant-name">
+              <a 
+                href={destinationUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                style={{ 
+                  color: "inherit", 
+                  textDecoration: "none",
+                  cursor: grant.sourceUrl ? "pointer" : "default"
+                }}
+                onMouseEnter={(e) => { if(grant.sourceUrl) e.currentTarget.style.textDecoration = "underline"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
+              >
+                {grant.title || grant.name || "Untitled Grant Opportunity"}
+              </a>
+            </h3>
+            <p className="grant-funder">{grant.funder || grant.source}</p>
           </div>
-          <ScoreBadge score={grant.score} />
+          <ScoreBadge score={grant.score || grant.matchScore} />
         </div>
 
         <p className="grant-summary">{grant.summary}</p>
 
         <div className="grant-meta-row">
           <span className="meta-pill">
-            ${grant.amountMin.toLocaleString()}–${grant.amountMax.toLocaleString()}
+            ${grant.amountMin?.toLocaleString() || "0"}–${grant.amountMax?.toLocaleString() || "0"}
           </span>
           <span className={`meta-pill${daysLeft <= 14 ? " meta-pill-urgent" : ""}`}>
             <IconClock width={13} height={13} /> Due {formatDate(grant.deadline)}
             {daysLeft <= 21 && daysLeft > 0 ? ` · ${daysLeft}d left` : ""}
           </span>
-          <span className="meta-pill meta-pill-muted">via {grant.source}</span>
+          
+          {/* Functional hyperlink modifier for metadata badge */}
+          {grant.sourceUrl ? (
+            <a 
+              href={destinationUrl} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="meta-pill meta-pill-muted"
+              style={{ textDecoration: "none" }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--text-muted)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; }}
+            >
+              via {grant.source} ↗
+            </a>
+          ) : (
+            <span className="meta-pill meta-pill-muted">via {grant.source}</span>
+          )}
         </div>
 
         <div className="chip-row">
-          {grant.matchedFocuses.map((f) => (
+          {grant.matchedFocuses?.map((f) => (
             <span className="match-chip" key={f}>
               {f}
             </span>
@@ -70,18 +100,24 @@ export function GrantCard({ grant, rank, selected, onToggleSelect }) {
           <div className="grant-details">
             <div>
               <strong>Eligibility</strong>
-              <p>{grant.eligibility}</p>
+              <p>{grant.eligibility || "Refer to original listing document rules."}</p>
             </div>
             <div>
               <strong>Application requirements</strong>
               <ul>
-                {grant.requirements.map((r) => (
+                {grant.requirements?.map((r) => (
                   <li key={r}>{r}</li>
                 ))}
               </ul>
             </div>
-            <a href={grant.sourceUrl} target="_blank" rel="noreferrer" className="link-btn">
-              View original listing on {grant.source}
+            <a 
+              href={destinationUrl} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="link-btn"
+              style={{ fontWeight: "600", marginTop: "4px" }}
+            >
+              View original listing on {grant.source} ↗
             </a>
           </div>
         )}

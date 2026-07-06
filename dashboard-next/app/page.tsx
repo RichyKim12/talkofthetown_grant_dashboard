@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { PALETTES } from "@/data/palettes";
-// import { SEED_PROFILE } from "@/data/mockData";
 import { Toast, useToasts } from "@/components/Toast";
 import { ProgressSteps } from "@/components/ProgressSteps";
 import { PaletteSwitcher } from "@/components/PaletteSwitcher";
@@ -36,7 +35,11 @@ export default function DashboardRoot() {
   const { toasts, addToast, dismissToast } = useToasts();
   const palette = PALETTES[paletteKey];
 
-  // Hydrate grants + selected IDs from sessionStorage once, on mount.
+  // Dynamically map palette colors to style objects
+  const cssVars = Object.fromEntries(
+    Object.entries(palette).filter(([k]) => k.startsWith("--"))
+  );
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -50,7 +53,6 @@ export default function DashboardRoot() {
     } catch {}
   }, []);
 
-  // Keep sessionStorage in sync whenever grants or selectedIds change.
   useEffect(() => {
     if (typeof window === "undefined") return;
     sessionStorage.setItem("discovered_grants", JSON.stringify(grants));
@@ -90,13 +92,64 @@ export default function DashboardRoot() {
     loadProfile();
   }, []);
 
+  // --- AESTHETICALLY PLEASING LOADING COMPONENT ---
   if (loading) {
-    return <div className="screen-loading">Loading configuration profile...</div>;
+    return (
+      <div 
+        style={{
+          ...cssVars,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "100vw",
+          height: "100vh",
+          backgroundColor: "var(--bg-app, #f9fafb)",
+          fontFamily: "system-ui, -apple-system, sans-serif"
+        }}
+      >
+        <style>{`
+          @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+          @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+          .loader-spin { animation: spin 0.8s linear infinite; }
+          .loader-pulse { animation: pulse 1.8s ease-in-out infinite; }
+        `}</style>
+        
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1.25rem" }}>
+          {/* Minimalist Micro-Indicator Spinner */}
+          <div 
+            className="loader-spin"
+            style={{
+              width: "32px",
+              height: "32px",
+              border: "3px solid var(--border, #e5e7eb)",
+              borderTopColor: "var(--accent, #2563eb)",
+              borderRadius: "50%"
+            }} 
+          />
+          
+          {/* Subtle text block */}
+          <div style={{ textAlign: "center" }}>
+            <h2 
+              className="loader-pulse"
+              style={{
+                margin: 0,
+                fontSize: "0.95rem",
+                fontWeight: 600,
+                letterSpacing: "-0.01em",
+                color: "var(--text-primary, #111827)"
+              }}
+            >
+              Loading workspace
+            </h2>
+            <p style={{ margin: "4px 0 0", fontSize: "0.8rem", color: "var(--text-muted, #6b7280)" }}>
+              Initializing configuration metrics...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   }
-
-  const cssVars = Object.fromEntries(
-    Object.entries(palette).filter(([k]) => k.startsWith("--"))
-  );
 
   const markDone = (key: string) => setCompleted((prev) => new Set(prev).add(key));
   const selectedGrants = grants.filter((g: any) => selectedIds.includes(g.id)) as any[];
@@ -134,7 +187,6 @@ export default function DashboardRoot() {
         </div>
       </aside>
 
-      {/* DYNAMIC HEIGHT, MAX-WIDTH, AND PADDING CONTROL */}
       <main 
         className="main-area" 
         style={
@@ -145,7 +197,7 @@ export default function DashboardRoot() {
                 height: "100vh", 
                 maxHeight: "100vh",
                 overflow: "hidden", 
-                padding: 0 // Eliminate conflicting parent paddings for workspace boundaries
+                padding: 0 
               } 
             : undefined
         }

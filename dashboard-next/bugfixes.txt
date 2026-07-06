@@ -1,1 +1,7 @@
 Should active drafts be moved to history when session closes or stays as active?
+
+How to properly guardrail against hallucinations for the gemini prompts
+
+How to do evaluation frameworks.
+
+Implement hyperlinks properly to view the original listing.
