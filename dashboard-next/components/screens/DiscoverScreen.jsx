@@ -11,6 +11,8 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
   const [progressMsg, setProgressMsg] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
 
+
+
   // Exclusions tracking states
   const [seenGrantIds, setSeenGrantIds] = useState([]);
   const [notInterestedIds, setNotInterestedIds] = useState([]);
@@ -19,6 +21,16 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
   const focuses = profile?.focuses || [];
   const focusPreview = isExpanded ? focuses : focuses.slice(0, 4);
   const extraCount = Math.max(0, focuses.length - 4);
+
+  // Initialize the slider metric preference tracking value using the camelCase payload property
+  const [minMatchScore, setMinMatchScore] = useState(profile?.minMatchScore ?? 70);
+
+  // Sync threshold score fallback state when the active user profile hydrates asynchronously
+  useEffect(() => {
+    if (profile && typeof profile.minMatchScore === "number") {
+      setMinMatchScore(profile.minMatchScore);
+    }
+  }, [profile]);
 
   // Load seen tracking cache from local storage and sync historical states from Supabase
   useEffect(() => {
@@ -58,6 +70,23 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
     setPhase(grants.length ? "done" : "idle");
   }, [grants]);
 
+  // Handle immediate visual input changes, then persist state backend update metrics
+  const handleSliderChange = async (e) => {
+    const newScore = Number(e.target.value);
+    setMinMatchScore(newScore);
+
+    try {
+      const response = await fetch("/api/profile/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ min_match_score: newScore }),
+      });
+      if (!response.ok) throw new Error("Server declined sync updates.");
+    } catch (err) {
+      console.error("Failed to persist threshold metrics upstream:", err);
+    }
+  };
+
   const runDiscovery = async () => {
     if (focuses.length === 0) {
       addToast("Add at least one focus area in your profile before searching.", "error");
@@ -71,7 +100,7 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
       const response = await fetch("/api/discover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           profile,
           historyIds: historicalIds,
           temporarySeenIds: seenGrantIds,
@@ -88,20 +117,26 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
 
       let freshGrants = data.grants || [];
 
-      // 4. Sort match scores in descending order
+      // 1. Sort match scores in descending order
       freshGrants.sort((a, b) => {
         const scoreA = a.score || a.matchScore || 0;
         const scoreB = b.score || b.matchScore || 0;
         return scoreB - scoreA;
       });
 
-      // NEW CONSTRAINT: Ensure only items with a valid sourceUrl are kept
+      // 2. Structural URL Check: Drop any entries without web guidelines
       freshGrants = freshGrants.filter(g => g.sourceUrl && g.sourceUrl.trim() !== "" && g.sourceUrl !== "#");
 
-      // Filter out any newly fetched grants that match "Not Interested" lists locally
+      // 3. THRESHOLD FILTER: Discard choices matching below state metric thresholds
+      freshGrants = freshGrants.filter(g => {
+        const currentScore = g.score || g.matchScore || 0;
+        return currentScore >= minMatchScore;
+      });
+
+      // 4. Mute List Check: Filter out items database-muted by user
       freshGrants = freshGrants.filter(g => !notInterestedIds.includes(String(g.id)));
 
-      // 1. Temporarily save searched grants from today's active session
+      // Temporarily save searched grants from today's active session
       const newSeenIds = [...new Set([...seenGrantIds, ...freshGrants.map(g => String(g.id))])];
       setSeenGrantIds(newSeenIds);
       localStorage.setItem("discovered_seen_today", JSON.stringify(newSeenIds));
@@ -111,7 +146,7 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
 
       setPhase("done");
       onFoundGrants();
-      addToast(`Found ${freshGrants.length} matching grants using AI discovery.`, "success");
+      addToast(`Found ${freshGrants.length} matching grants meeting your threshold metrics.`, "success");
     } catch (err) {
       console.error(err);
       setPhase("idle");
@@ -119,7 +154,6 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
     }
   };
 
-  // 2. Persist the "Not Interested" choice permanently to your database layout context
   const handleNotInterested = async (id) => {
     const stringId = String(id);
     setGrants((prev) => prev.filter((g) => String(g.id) !== stringId));
@@ -160,10 +194,10 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
         subtitle="The AI searches public grant sources and ranks results against your organization profile. Check the box on any grant you'd like a proposal draft for."
       />
 
-      <div className="panel discover-panel">
-        <div className="discover-row">
+      <div className="panel discover-panel" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        <div className="discover-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
           <div className="discover-context">
-            <p className="discover-context-label">Searching using your saved focus areas</p>
+            <p className="discover-context-label" style={{ margin: "0 0 0.5rem 0", fontWeight: "600", color: "var(--text-secondary)" }}>Searching using your saved focus areas</p>
             <div className="chip-row" style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
               {focuses.length === 0 ? (
                 <span className="static-chip static-chip-muted" style={{ fontStyle: "italic" }}>
@@ -205,8 +239,27 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
             {grants.length ? "Search again" : "Find grants"}
           </ActionButton>
         </div>
+
+        {/* Persistent Dynamic Match Score Slider Row UI */}
+        <div className="filter-row" style={{ borderTop: "1px solid var(--border, #e5e7eb)", paddingTop: "1rem", display: "flex", alignItems: "center" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", width: "100%", maxWidth: "340px" }}>
+            <label style={{ fontSize: "0.85rem", fontWeight: "600", color: "var(--text-secondary)" }}>
+              Minimum Relevancy Filter Cutoff: <span style={{ color: "var(--primary-color, #2563eb)", fontWeight: "700" }}>{minMatchScore}%</span>
+            </label>
+            <input
+              type="range"
+              min="50"
+              max="95"
+              step="5"
+              value={minMatchScore}
+              onChange={handleSliderChange}
+              style={{ width: "100%", cursor: "pointer", accentColor: "var(--primary-color, #2563eb)" }}
+            />
+          </div>
+        </div>
+
         {(phase === "searching" || phase === "ranking") && (
-          <div className="progress-line" role="status" aria-live="polite" style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "1rem" }}>
+          <div className="progress-line" role="status" aria-live="polite" style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem" }}>
             <Spinner size={16} />
             <span>{progressMsg}</span>
           </div>
@@ -227,6 +280,14 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
         </div>
       )}
 
+      {phase === "done" && grants.length === 0 && (
+        <EmptyState
+          icon={IconSearch}
+          title="No opportunities met your criteria"
+          body="Grants were found but fell below your minimum match score threshold. Try lowering the bar slider or expanding your profile focus criteria tags."
+        />
+      )}
+
       {phase === "done" && grants.length > 0 && (
         <>
           <div className="results-meta" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "1rem" }}>
@@ -238,11 +299,11 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
           </div>
           <div className="grant-list" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             {grants.map((g, i) => (
-              <GrantCard 
-                key={g.id} 
-                grant={g} 
-                rank={i + 1} 
-                selected={selectedIds.includes(g.id)} 
+              <GrantCard
+                key={g.id}
+                grant={g}
+                rank={i + 1}
+                selected={selectedIds.includes(g.id)}
                 onToggleSelect={toggleSelect}
                 onNotInterested={handleNotInterested}
               />

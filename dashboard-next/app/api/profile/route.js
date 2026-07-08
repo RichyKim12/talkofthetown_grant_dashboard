@@ -2,7 +2,6 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/utils/supabaseServer";
 
-
 export async function GET() {
   try {
     const { data, error } = await supabaseServer
@@ -30,7 +29,8 @@ export async function GET() {
       serviceArea: data.service_area || "",
       mission: data.mission || "",
       focuses: data.focuses || [],
-      customFocuses: data.custom_focuses || []
+      customFocuses: data.custom_focuses || [],
+      minMatchScore: data.min_match_score ?? 70 // Added mapping for the frontend score preference
     };
 
     return NextResponse.json({ profile: profileData }, { status: 200 });
@@ -38,7 +38,6 @@ export async function GET() {
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
-
 
 export async function POST(request) {
   try {
@@ -65,7 +64,9 @@ export async function POST(request) {
         service_area: body.serviceArea,
         mission: body.mission,
         focuses: body.focuses,             // Saves perfectly as a text[] array or jsonb type in Supabase
-        custom_focuses: body.customFocuses  // Saves perfectly as a text[] array or jsonb type in Supabase
+        custom_focuses: body.customFocuses, // Saves perfectly as a text[] array or jsonb type in Supabase
+        // Fallback to 70 if not passed in the body, ensuring the column remains populated
+        min_match_score: body.minMatchScore !== undefined ? Number(body.minMatchScore) : 70 
       })
       .select()
       .single();
@@ -85,7 +86,8 @@ export async function POST(request) {
       serviceArea: data.service_area,
       mission: data.mission,
       focuses: data.focuses,
-      customFocuses: data.custom_focuses
+      customFocuses: data.custom_focuses,
+      minMatchScore: data.min_match_score // Returned to update state seamlessly
     };
 
     return NextResponse.json({ success: true, profile: updatedProfile }, { status: 200 });
