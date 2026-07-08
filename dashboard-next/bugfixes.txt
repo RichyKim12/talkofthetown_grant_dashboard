@@ -1,7 +1,13 @@
-Should active drafts be moved to history when session closes or stays as active?
-
 How to properly guardrail against hallucinations for the gemini prompts
 
 How to do evaluation frameworks.
 
 Implement hyperlinks properly to view the original listing.
+
+Need to do proper hyperlinks
+
+Need to implement saved grants vs not interested grants
+
+filter based on match rating score.
+
+temp storage for what was already stored.

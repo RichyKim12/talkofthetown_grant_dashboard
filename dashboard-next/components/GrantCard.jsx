@@ -13,33 +13,39 @@ export function ScoreBadge({ score }) {
   );
 }
 
-export function GrantCard({ grant, rank, selected, onToggleSelect }) {
+export function GrantCard({ grant, rank, selected, onToggleSelect, onNotInterested }) {
   const [expanded, setExpanded] = useState(false);
+  const [isMuting, setIsMuting] = useState(false);
   const daysLeft = daysUntil(grant.deadline);
 
-  // Safe fallback URL handler
   const destinationUrl = grant.sourceUrl || "#";
+
+  const handleMuteClick = async () => {
+    if (isMuting) return;
+    setIsMuting(true);
+    await onNotInterested?.(grant.id);
+    // State layout cleanup handles unmounting, but we clear flag as a safety guarantee
+    setIsMuting(false);
+  };
 
   return (
     <div className={`grant-card${selected ? " grant-card-selected" : ""}`}>
-      {/* 1. Left Column: Keeps the existing layout structural balance intact */}
       <div className="grant-rank">#{rank}</div>
-      
-      {/* 2. Right Column */}
+
       <div className="grant-card-main">
         <div className="grant-card-top">
           <div>
             <h3 className="grant-name">
-              <a 
-                href={destinationUrl} 
-                target="_blank" 
+              <a
+                href={destinationUrl}
+                target="_blank"
                 rel="noopener noreferrer"
-                style={{ 
-                  color: "inherit", 
+                style={{
+                  color: "inherit",
                   textDecoration: "none",
                   cursor: grant.sourceUrl ? "pointer" : "default"
                 }}
-                onMouseEnter={(e) => { if(grant.sourceUrl) e.currentTarget.style.textDecoration = "underline"; }}
+                onMouseEnter={(e) => { if (grant.sourceUrl) e.currentTarget.style.textDecoration = "underline"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
               >
                 {grant.title || grant.name || "Untitled Grant Opportunity"}
@@ -60,13 +66,12 @@ export function GrantCard({ grant, rank, selected, onToggleSelect }) {
             <IconClock width={13} height={13} /> Due {formatDate(grant.deadline)}
             {daysLeft <= 21 && daysLeft > 0 ? ` · ${daysLeft}d left` : ""}
           </span>
-          
-          {/* Functional hyperlink modifier for metadata badge */}
+
           {grant.sourceUrl ? (
-            <a 
-              href={destinationUrl} 
-              target="_blank" 
-              rel="noopener noreferrer" 
+            <a
+              href={destinationUrl}
+              target="_blank"
+              rel="noopener noreferrer"
               className="meta-pill meta-pill-muted"
               style={{ textDecoration: "none" }}
               onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--text-muted)"; }}
@@ -110,10 +115,10 @@ export function GrantCard({ grant, rank, selected, onToggleSelect }) {
                 ))}
               </ul>
             </div>
-            <a 
-              href={destinationUrl} 
-              target="_blank" 
-              rel="noopener noreferrer" 
+            <a
+              href={destinationUrl}
+              target="_blank"
+              rel="noopener noreferrer"
               className="link-btn"
               style={{ fontWeight: "600", marginTop: "4px" }}
             >
@@ -122,11 +127,51 @@ export function GrantCard({ grant, rank, selected, onToggleSelect }) {
           </div>
         )}
 
-        <div className="grant-select-row">
-          <label className="checkbox-row">
+        <div className="grant-select-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1.5rem", paddingTop: "1rem", borderTop: "1px solid var(--border, #e5e7eb)" }}>
+          <label className="checkbox-row" style={{ cursor: "pointer" }}>
             <input type="checkbox" checked={selected} onChange={() => onToggleSelect(grant.id)} />
-            <span>Select this grant to write a proposal</span>
+            <span style={{ marginLeft: "0.5rem" }}>Select this grant to write a proposal</span>
           </label>
+
+          <button
+            type="button"
+            className="mute-action-btn"
+            disabled={isMuting}
+            onClick={handleMuteClick}
+            style={{
+              color: isMuting ? "#9ca3af" : "#dc2626",
+              backgroundColor: isMuting ? "#f3f4f6" : "#fef2f2",
+              border: `1px solid ${isMuting ? "#e5e7eb" : "#fca5a5"}`,
+              borderRadius: "6px",
+              fontSize: "0.85rem",
+              fontWeight: "600",
+              cursor: isMuting ? "not-allowed" : "pointer",
+              padding: "6px 12px",
+              transition: "all 0.15s ease",
+              display: "inline-flex",
+              alignItems: "center"
+            }}
+            onMouseEnter={(e) => {
+              if (!isMuting) {
+                e.currentTarget.style.backgroundColor = "#fee2e2";
+                e.currentTarget.style.borderColor = "#ef4444";
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isMuting) {
+                e.currentTarget.style.backgroundColor = "#fef2f2";
+                e.currentTarget.style.borderColor = "#fca5a5";
+              }
+            }}
+          >
+            {isMuting ? (
+              <>
+                <span style={{ marginRight: "6px" }}>⏳</span> Muting...
+              </>
+            ) : (
+              "✕ Not Interested"
+            )}
+          </button>
         </div>
       </div>
     </div>

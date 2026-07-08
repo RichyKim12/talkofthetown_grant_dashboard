@@ -11,13 +11,46 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
   const [progressMsg, setProgressMsg] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
 
+  // States for local Exclusion Tracking Loops
+  const [seenGrantIds, setSeenGrantIds] = useState([]);
+  const [notInterestedIds, setNotInterestedIds] = useState([]);
+  const [historicalIds, setHistoricalIds] = useState([]);
+
   const focuses = profile?.focuses || [];
   const focusPreview = isExpanded ? focuses : focuses.slice(0, 4);
   const extraCount = Math.max(0, focuses.length - 4);
 
-  // grants/selectedIds hydration + sessionStorage sync now live in DashboardRoot,
-  // so a refresh on the proposals screen still has the raw grant data available.
-  // This screen just reacts to whatever grants it's handed.
+  // Hydrate seen IDs from local storage (session-based) and fetch historical tracking data from the DB
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedSeen = localStorage.getItem("discovered_seen_today");
+      if (savedSeen) setSeenGrantIds(JSON.parse(savedSeen));
+    }
+
+    async function fetchHistoricalData() {
+      try {
+        // Fetch existing proposal IDs and database-persisted muted grant IDs concurrently
+        const [proposalsRes, mutedRes] = await Promise.all([
+          fetch("/api/proposals"),
+          fetch("/api/grants/muted") // Your endpoint that returns user-muted grant IDs
+        ]);
+
+        if (proposalsRes.ok) {
+          const propData = await proposalsRes.json();
+          if (propData.proposals) setHistoricalIds(propData.proposals.map((p) => p.grant_id));
+        }
+
+        if (mutedRes.ok) {
+          const mutedData = await mutedRes.json();
+          if (mutedData.mutedIds) setNotInterestedIds(mutedData.mutedIds);
+        }
+      } catch (err) {
+        console.error("Failed to load historical exclusion context data:", err);
+      }
+    }
+    fetchHistoricalData();
+  }, []);
+
   useEffect(() => {
     setPhase(grants.length ? "done" : "idle");
   }, [grants]);
@@ -35,7 +68,12 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
       const response = await fetch("/api/discover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile }),
+        body: JSON.stringify({ 
+          profile,
+          historyIds: historicalIds,
+          temporarySeenIds: seenGrantIds,
+          notInterestedIds: notInterestedIds // Transmit full database-backed blocklists upstream
+        }),
       });
 
       const data = await response.json();
@@ -45,7 +83,23 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
       setProgressMsg("Sifting and scoring matches...");
       await new Promise((resolve) => setTimeout(resolve, 600));
 
-      const freshGrants = data.grants || [];
+      let freshGrants = data.grants || [];
+
+      // Sort match scores in descending order
+      freshGrants.sort((a, b) => {
+        const scoreA = a.score || a.matchScore || 0;
+        const scoreB = b.score || b.matchScore || 0;
+        return scoreB - scoreA;
+      });
+
+      // Filter out any newly fetched grants that match "Not Interested" lists locally as a safety guard
+      freshGrants = freshGrants.filter(g => !notInterestedIds.includes(g.id));
+
+      // Temporarily accumulate searched grants from today's active session in local storage
+      const newSeenIds = [...new Set([...seenGrantIds, ...freshGrants.map(g => g.id)])];
+      setSeenGrantIds(newSeenIds);
+      localStorage.setItem("discovered_seen_today", JSON.stringify(newSeenIds));
+
       setGrants(freshGrants);
       setSelectedIds([]);
 
@@ -56,6 +110,31 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
       console.error(err);
       setPhase("idle");
       addToast("Couldn't complete the search. Verify backend credentials.", "error");
+    }
+  };
+
+  // Persist the "Not Interested" choice permanently to your database layout context
+  const handleNotInterested = async (id) => {
+    // Optimistically filter the view layout elements immediately for rapid UX feedback
+    setGrants((prev) => prev.filter((g) => g.id !== id));
+    setSelectedIds((prev) => prev.filter((x) => x !== id));
+    setNotInterestedIds((prev) => [...new Set([...prev, id])]);
+
+    try {
+      const response = await fetch("/api/grants/mute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ grantId: id }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Database failed to process the muted record action.");
+      }
+      
+      addToast("Grant preference saved. It won't show up in future searches.", "info");
+    } catch (err) {
+      console.error(err);
+      addToast("Failed to sync preference with database, but hid it for this session.", "error");
     }
   };
 
@@ -156,7 +235,14 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
           </div>
           <div className="grant-list" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             {grants.map((g, i) => (
-              <GrantCard key={g.id} grant={g} rank={i + 1} selected={selectedIds.includes(g.id)} onToggleSelect={toggleSelect} />
+              <GrantCard 
+                key={g.id} 
+                grant={g} 
+                rank={i + 1} 
+                selected={selectedIds.includes(g.id)} 
+                onToggleSelect={toggleSelect}
+                onNotInterested={handleNotInterested}
+              />
             ))}
           </div>
           <div className="discover-footer" style={{ marginTop: "2rem" }}>
