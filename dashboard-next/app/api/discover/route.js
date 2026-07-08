@@ -17,10 +17,10 @@ export async function POST(request) {
 
     // Capture the absolute current system date
     const today = new Date();
-    const formattedToday = today.toISOString().split('T')[0]; // e.g., "2026-07-06"
+    const formattedToday = today.toISOString().split('T')[0]; // e.g., "2026-07-08"
 
     const prompt = `
-      CONTEXT: You are a hyper-factual grant tracking engine operating with zero tolerance for speculative invention or fake data.
+      CONTEXT: You are a hyper-factual grant tracking engine operating with zero tolerance for speculative invention, fake data, or broken links.
       
       TASK: Match the following organization profile against real, verifiable public, private, or corporate grant opportunities that have historically run or are currently recurring.
       
@@ -32,55 +32,47 @@ export async function POST(request) {
       
       STRICT ANTI-HALLUCINATION GUARDRAILS:
       1. REAL ENTITIES ONLY: Only return known, historically verifiable grantmakers (e.g., specific corporate foundations, major family funds, state/federal agencies). Never generate fake foundation names.
-      2. FUTURE DEADLINES ONLY: Today's date is strictly ${formattedToday}. Every returned opportunity MUST have an application deadline or cycle window that closes AFTER ${formattedToday}.
-      3. HANDLING UNKNOWN DEADLINES: If the exact current cycle deadline has not been publicly finalized by the funder, extrapolate from their historical cadence and project a realistic upcoming future deadline (e.g., later in 2026 or early 2027) based strictly on past application windows.
+      2. REAL LINKS REQUIRED: The "sourceUrl" must be a real, official link to the grant guidelines, application form, or foundation home portal. If you cannot verify a real web link for an opportunity, DO NOT include it.
+      3. FUTURE DEADLINES ONLY: Today's date is strictly ${formattedToday}. Every returned opportunity MUST have an application deadline or cycle window that closes AFTER ${formattedToday}.
+      4. ZERO-QUOTA & MAXIMUM CAP POLICY: There is no minimum item requirement. If no highly accurate, real-world matches with verifiable links are available for this profile, return an empty array [] exactly. If multiple matches exist, you MUST only return the TOP 6 highest-scoring opportunities max. Quality and strict factual accuracy are preferred over quantity.
 
       [Output Format Instructions] 
-
-      Provide the output as a valid JSON Array containing exactly 10 objects. Each object must include all of the following fields: 
-
-        
+      Return a valid JSON array of objects. If no matches exist, return []. Each object must contain the following fields:
 
       - id: A unique slug string (e.g., 'foundation-youth-2026'). 
-
       - title: Full formal name of the grant opportunity. 
-
       - source: The issuing foundation or agency name. 
-
+      - sourceUrl: The exact official web URL or portal path where the grant guidelines are hosted.
       - amountMin: Minimum integer dollar amount funded (e.g., 25000). Do not include dollar signs or commas. 
-
       - amountMax: Maximum integer dollar amount funded (e.g., 50000). Do not include dollar signs or commas. 
-
-      - deadline: A future date string representing when the application closes. Must be chronologically after July 1, 2026 (e.g., '2026-09-15' or 'October 1, 2026'). 
-
+      - deadline: A future date string representing when the application closes. Must be chronologically after ${formattedToday} (e.g., '2026-09-15'). 
       - summary: Comprehensive description explaining the relevance of this grant to the organization. 
-
       - matchScore: Relevancy matching score from 1 to 100 based on their profile. 
-
       - matchedFocuses: An array of short text strings representing the subset of the user's focus areas that align with this specific grant. 
-
       - requirements: An array of short text strings detailing the prerequisite criteria or documents needed to apply for the grant. 
-      `;
+    `;
+
     console.log(prompt);
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,
       config: {
-        // --- DETERMINISTIC TUNING PARAMETERS ---
-        temperature: 0.1,    // Forces factual, predictable token choices instead of creative ones
-        topP: 0.2,           // Limits the token selection pool to only the most confident options
-        maxOutputTokens: 8192,
+        temperature: 0.1,    // Kept low for high predictability and factuality
+        topP: 0.2,           
+        maxOutputTokens: 4096,
 
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
-          description: `List of 10 verified grants matching the data contract. All deadlines must be strictly after ${formattedToday}.`,
+          // Explicitly capping schema contract target at 6 items max to guarantee runtime safety
+          description: `A JSON array of real, verified grants matching the data contract. Max 6 items. If zero verified options are confidently found, return an empty array [].`,
           items: {
             type: Type.OBJECT,
             properties: {
               id: { type: Type.STRING, description: "Unique slug string (e.g., foundation-youth-2026)." },
               title: { type: Type.STRING, description: "Full formal name of the grant opportunity." },
               source: { type: Type.STRING, description: "The issuing foundation or agency name." },
+              sourceUrl: { type: Type.STRING, description: "The exact official web URL or portal path where the grant guidelines are hosted." },
               amountMin: { type: Type.INTEGER, description: "Minimum integer dollar amount funded (e.g. 25000)." },
               amountMax: { type: Type.INTEGER, description: "Maximum integer dollar amount funded (e.g. 50000)." },
               deadline: {
@@ -104,6 +96,7 @@ export async function POST(request) {
               "id",
               "title",
               "source",
+              "sourceUrl",
               "amountMin",
               "amountMax",
               "deadline",
@@ -116,6 +109,12 @@ export async function POST(request) {
         },
       },
     });
+
+    // Check if response stream cut off abruptly before array layout finalized
+    if (!response.text || response.text.trim() === "" || !response.text.endsWith("]")) {
+      console.error("Raw token payload stream arrived incomplete or corrupted from engine.");
+      return NextResponse.json({ error: "The engine timed out searching data. Try focusing your search area criteria tags." }, { status: 504 });
+    }
 
     const grantsData = JSON.parse(response.text);
     return NextResponse.json({ success: true, grants: grantsData }, { status: 200 });

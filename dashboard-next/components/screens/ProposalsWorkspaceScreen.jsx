@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { ActionButton, Spinner } from "../ActionButton";
 import { IconCheck } from "../icons";
-import "../../styles/ProposalsWorkspaceScreen.css"; 
+import "../../styles/ProposalsWorkspaceScreen.css";
 
 export function ProposalsWorkspaceScreen({
   profile,
@@ -12,19 +12,56 @@ export function ProposalsWorkspaceScreen({
   goDiscover,
   onRemoveSelected,
 }) {
-  const [activeTab, setActiveTab] = useState("selected"); 
-  const [activeId, setActiveId] = useState(selectedGrants[0]?.id || null);
+  const [activeTab, setActiveTab] = useState("selected");
+  
+  // FIX 1: Default to null strictly on load so no card is implicitly chosen 
+  const [activeId, setActiveId] = useState(null);
+  
   const [draftTexts, setDraftTexts] = useState({});
   const [historicalProposals, setHistoricalProposals] = useState([]);
   const [syncStatusById, setSyncStatusById] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [composingId, setComposingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
-  
+  const [archivingId, setArchivingId] = useState(null);
+
   // Conversational Refinement State Variables
   const [chatInput, setChatInput] = useState("");
   const [isIterating, setIsIterating] = useState(false);
+  const [revertingId, setRevertingId] = useState(null);
 
+  const handleRevertToActive = async (grantId, targetGrant) => {
+    setRevertingId(grantId);
+    const text = draftTexts[grantId] || "";
+    const cleanGrant = targetGrant?.grant_id ? targetGrant : normalizeGrant(targetGrant);
+
+    try {
+      const res = await fetch("/api/proposals", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          grantId: grantId,
+          grantTitle: cleanGrant?.grant_title || "Untitled Grant",
+          grantFunder: cleanGrant?.grant_funder || "Unknown Funder",
+          proposalText: text,
+          status: "draft", 
+        }),
+      });
+
+      if (!res.ok) throw new Error();
+
+      setHistoricalProposals((prev) =>
+        prev.map((p) => (p.grant_id === grantId ? { ...p, status: "draft" } : p))
+      );
+
+      addToast("Proposal restored to Active Drafts.", "success");
+      setActiveTab("active");
+    } catch (err) {
+      addToast("Failed to restore proposal.", "error");
+    } finally {
+      setRevertingId(null);
+    }
+  };
   const debounceTimersRef = useRef({});
 
   const rawGrantsById = useMemo(() => {
@@ -55,26 +92,42 @@ export function ProposalsWorkspaceScreen({
   const { selectedTabs, activeTabs, historyTabs } = useMemo(() => {
     const selectedList = [];
     const activeList = [];
-    
+    const historyList = [];
+
     selectedGrants.forEach((g) => {
       const normalized = normalizeGrant(g);
-      if (draftTexts[normalized.grant_id]) {
-        activeList.push(normalized);
-      } else {
+      if (!draftTexts[normalized.grant_id]) {
         selectedList.push(normalized);
       }
     });
 
-    const historyList = historicalProposals
-      .filter((hp) => !rawGrantsById[hp.grant_id])
-      .map((p) => normalizeGrant(p));
+    historicalProposals.forEach((hp) => {
+      const normalized = normalizeGrant(hp);
+      if (hp.status === "archived" || hp.status === "history") {
+        historyList.push(normalized);
+      } else if (draftTexts[normalized.grant_id]) {
+        activeList.push(normalized);
+      }
+    });
 
     return {
       selectedTabs: selectedList,
       activeTabs: activeList,
       historyTabs: historyList,
     };
-  }, [selectedGrants, draftTexts, historicalProposals, rawGrantsById]);
+  }, [selectedGrants, draftTexts, historicalProposals]);
+
+  // Set active tabs dynamically based on items present on initial mount hydration loops
+  useEffect(() => {
+    if (selectedGrants.length > 0) {
+      setActiveTab("selected");
+      setActiveId(selectedGrants[0].id);
+    } else if (activeTabs.length > 0) {
+      setActiveTab("active");
+    } else if (historyTabs.length > 0) {
+      setActiveTab("history");
+    }
+  }, [selectedGrants]);
 
   useEffect(() => {
     async function loadWorkspaceAndHistory() {
@@ -116,6 +169,9 @@ export function ProposalsWorkspaceScreen({
         ? targetGrant
         : normalizeGrant(targetGrant) || { grant_id: grantId, grant_title: "Untitled Grant", grant_funder: "Unknown Funder" };
 
+      const currentRecord = historicalProposals.find(p => p.grant_id === grantId);
+      const currentStatus = currentRecord?.status || "draft";
+
       try {
         const res = await fetch("/api/proposals", {
           method: "PATCH",
@@ -125,7 +181,7 @@ export function ProposalsWorkspaceScreen({
             grantTitle: cleanGrant.grant_title,
             grantFunder: cleanGrant.grant_funder,
             proposalText: text,
-            status: "draft",
+            status: currentStatus,
           }),
         });
         if (!res.ok) throw new Error();
@@ -166,6 +222,7 @@ export function ProposalsWorkspaceScreen({
         setSyncStatusById((prev) => ({ ...prev, [grantId]: "All changes saved to cloud" }));
         addToast("Draft generated! Moved to Active Workspace.", "success");
         setActiveTab("active");
+        setActiveId(grantId);
       } else {
         addToast(data.error || "Gemini generation failed.", "error");
       }
@@ -176,7 +233,6 @@ export function ProposalsWorkspaceScreen({
     }
   };
 
-  // Iterates over the selected draft using real-time instructions
   const handleIterateDraft = async (targetGrant) => {
     if (!chatInput.trim() || !activeId) return;
     setIsIterating(true);
@@ -201,7 +257,7 @@ export function ProposalsWorkspaceScreen({
         setDraftTexts((prev) => ({ ...prev, [activeId]: data.data.proposal_text }));
         setSyncStatusById((prev) => ({ ...prev, [activeId]: "All changes saved to cloud" }));
         addToast("Draft successfully refined by Gemini!", "success");
-        setChatInput(""); 
+        setChatInput("");
       } else {
         addToast(data.error || "Refinement iteration failed.", "error");
         setSyncStatusById((prev) => ({ ...prev, [activeId]: "All changes saved to cloud" }));
@@ -213,10 +269,43 @@ export function ProposalsWorkspaceScreen({
     }
   };
 
+  const handleArchiveToHistory = async (grantId, targetGrant) => {
+    setArchivingId(grantId);
+    const text = draftTexts[grantId] || "";
+    const cleanGrant = targetGrant?.grant_id ? targetGrant : normalizeGrant(targetGrant);
+
+    try {
+      const res = await fetch("/api/proposals", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          grantId: grantId,
+          grantTitle: cleanGrant?.grant_title || "Untitled Grant",
+          grantFunder: cleanGrant?.grant_funder || "Unknown Funder",
+          proposalText: text,
+          status: "archived",
+        }),
+      });
+
+      if (!res.ok) throw new Error();
+
+      setHistoricalProposals((prev) =>
+        prev.map((p) => (p.grant_id === grantId ? { ...p, status: "archived" } : p))
+      );
+
+      addToast("Proposal moved to History tab.", "success");
+      setActiveId(null); // Deselect explicitly after moving to avoid confusion
+      setActiveTab("history");
+    } catch (err) {
+      addToast("Failed to move proposal to history.", "error");
+    } finally {
+      setArchivingId(null);
+    }
+  };
+
   const handleRemoveSelected = (grantId) => {
     if (activeId === grantId) {
-      const remaining = selectedGrants.filter((g) => g.id !== grantId);
-      setActiveId(remaining[0]?.id || historicalProposals[0]?.grant_id || null);
+      setActiveId(null);
     }
     onRemoveSelected?.(grantId);
   };
@@ -239,8 +328,7 @@ export function ProposalsWorkspaceScreen({
       onRemoveSelected?.(grantId);
 
       if (activeId === grantId) {
-        const remainingSelected = selectedGrants.filter((g) => g.id !== grantId);
-        setActiveId(remainingSelected[0]?.id || null);
+        setActiveId(null);
       }
 
       addToast("Deleted permanently from history.", "success");
@@ -292,7 +380,7 @@ export function ProposalsWorkspaceScreen({
       </body>
       </html>
     `;
-    
+
     const blob = new Blob(['\ufeff' + htmlContent], { type: 'application/msword' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -305,7 +393,10 @@ export function ProposalsWorkspaceScreen({
   };
 
   const allKnownTabs = [...selectedTabs, ...activeTabs, ...historyTabs];
-  const activeGrant = allKnownTabs.find((g) => g.grant_id === activeId) || allKnownTabs[0] || null;
+  
+  // FIX 2: Strict lookup mapping. If no activeId is tracked, activeGrant is deterministic null.
+  const activeGrant = activeId ? allKnownTabs.find((g) => g.grant_id === activeId) || null : null;
+  
   const activeRawGrant = activeGrant ? rawGrantsById[activeGrant.grant_id] : null;
   const hasDraftContent = activeId && draftTexts[activeId] !== undefined;
   const activeSyncStatus = (activeId && syncStatusById[activeId]) || "All changes saved to cloud";
@@ -337,7 +428,7 @@ export function ProposalsWorkspaceScreen({
         {tabs.map((g) => {
           const isActive = g.grant_id === activeId;
           const isDeleting = deletingId === g.grant_id;
-          
+
           let cardClasses = "workspace-card-btn";
           if (isActive) cardClasses += " active";
           if (type === "history") cardClasses += " history-bg";
@@ -352,11 +443,11 @@ export function ProposalsWorkspaceScreen({
                 <div className="workspace-card-meta">
                   <span className="workspace-card-funder">{g.grant_funder}</span>
                   <span className="workspace-card-status-label">
-                    {type === "selected" ? "Empty Shell" : "Active Draft"}
+                    {type === "selected" ? "Empty Shell" : type === "history" ? "Archived" : "Active Draft"}
                   </span>
                 </div>
               </button>
-              
+
               <button
                 onClick={() => type === "history" ? handleDeleteFromHistory(g.grant_id) : handleRemoveSelected(g.grant_id)}
                 disabled={isDeleting}
@@ -427,8 +518,29 @@ export function ProposalsWorkspaceScreen({
                     {activeGrant.amount ? ` · ${activeGrant.amount}` : ""}
                   </span>
                 </div>
-                
+
                 <div className="workspace-canvas-right-actions">
+                  {activeTab === "active" && hasDraftContent && (
+                    <button
+                      onClick={() => handleArchiveToHistory(activeId, activeRawGrant || activeGrant)}
+                      className="workspace-download-btn"
+                      style={{ marginRight: "8px", backgroundColor: "var(--accent-subtle)", borderColor: "var(--accent)" }}
+                      disabled={archivingId === activeId}
+                    >
+                      {archivingId === activeId ? "Archiving..." : "Move to History"}
+                    </button>
+                  )}
+                  {activeTab === "history" && (
+                    <button
+                      onClick={() => handleRevertToActive(activeId, activeRawGrant || activeGrant)}
+                      className="workspace-download-btn"
+                      style={{ marginRight: "8px", backgroundColor: "#e0f2fe", borderColor: "#0284c7", color: "#0369a1" }}
+                      disabled={revertingId === activeId}
+                    >
+                      {revertingId === activeId ? "Restoring..." : "Restore to Active"}
+                    </button>
+                  )}
+
                   {isDownloadable && (
                     <div className="workspace-download-group">
                       <button onClick={() => downloadAsPDF(activeGrant)} className="workspace-download-btn">PDF</button>
@@ -455,10 +567,9 @@ export function ProposalsWorkspaceScreen({
                         onChange={(e) => handleTextUpdate(e.target.value, activeRawGrant || activeGrant)}
                         className="workspace-textarea"
                         placeholder="Start typing your response proposal copy..."
-                        disabled={isIterating}
+                        disabled={isIterating || activeTab === "history"}
                       />
-                      
-                      {/* Active Prompt Overlay Layout */}
+
                       {isIterating && (
                         <div className="workspace-editor-overlay">
                           <div className="workspace-overlay-card">
@@ -468,31 +579,32 @@ export function ProposalsWorkspaceScreen({
                         </div>
                       )}
                     </div>
-                    
-                    {/* INLINE ITERATION CHAT BAR */}
-                    <div className="workspace-chat-bar">
-                      <input
-                        type="text"
-                        value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)}
-                        placeholder="Ask Gemini to refine this draft (e.g., 'Make the executive summary more formal')..."
-                        className="workspace-chat-input"
-                        disabled={isIterating}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            handleIterateDraft(activeRawGrant || activeGrant);
-                          }
-                        }}
-                      />
-                      <button
-                        onClick={() => handleIterateDraft(activeRawGrant || activeGrant)}
-                        disabled={isIterating || !chatInput.trim()}
-                        className="workspace-chat-send-btn"
-                      >
-                        {isIterating ? "Refining..." : "Refine Draft"}
-                      </button>
-                    </div>
+
+                    {activeTab !== "history" && (
+                      <div className="workspace-chat-bar">
+                        <input
+                          type="text"
+                          value={chatInput}
+                          onChange={(e) => setChatInput(e.target.value)}
+                          placeholder="Ask Gemini to refine this draft (e.g., 'Make the executive summary more formal')..."
+                          className="workspace-chat-input"
+                          disabled={isIterating}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              handleIterateDraft(activeRawGrant || activeGrant);
+                            }
+                          }}
+                        />
+                        <button
+                          onClick={() => handleIterateDraft(activeRawGrant || activeGrant)}
+                          disabled={isIterating || !chatInput.trim()}
+                          className="workspace-chat-send-btn"
+                        >
+                          {isIterating ? "Refining..." : "Refine Draft"}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="workspace-centered-prompt">
@@ -526,7 +638,7 @@ export function ProposalsWorkspaceScreen({
               </div>
             </div>
           ) : (
-            <div className="workspace-unselected-placeholder">
+            <div className="workspace-unselected-placeholder" style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%", minHeight: "300px", color: "var(--text-muted, #6b7280)", fontSize: "1.1rem", fontWeight: "500", fontStyle: "italic" }}>
               Select an application from the sidebar tabs to begin.
             </div>
           )}
