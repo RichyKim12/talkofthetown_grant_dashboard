@@ -34,7 +34,7 @@ export async function POST(request) {
       1. REAL ENTITIES ONLY: Only return known, historically verifiable grantmakers (e.g., specific corporate foundations, major family funds, state/federal agencies). Never generate fake foundation names.
       2. REAL LINKS REQUIRED: The "sourceUrl" must be a real, official link to the grant guidelines, application form, or foundation home portal. If you cannot verify a real web link for an opportunity, DO NOT include it.
       3. FUTURE DEADLINES ONLY: Today's date is strictly ${formattedToday}. Every returned opportunity MUST have an application deadline or cycle window that closes AFTER ${formattedToday}.
-      4. ZERO-QUOTA POLICY: There is no minimum item requirement. If no highly accurate, real-world matches with verifiable links are available for this profile, return an empty array [] exactly. Quality and strict factual accuracy are preferred over quantity.
+      4. ZERO-QUOTA & MAXIMUM CAP POLICY: There is no minimum item requirement. If no highly accurate, real-world matches with verifiable links are available for this profile, return an empty array [] exactly. If multiple matches exist, you MUST only return the TOP 6 highest-scoring opportunities max. Quality and strict factual accuracy are preferred over quantity.
 
       [Output Format Instructions] 
       Return a valid JSON array of objects. If no matches exist, return []. Each object must contain the following fields:
@@ -64,7 +64,8 @@ export async function POST(request) {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
-          description: `A JSON array of real, verified grants matching the data contract. If zero verified options are confidently found, return an empty array [].`,
+          // Explicitly capping schema contract target at 6 items max to guarantee runtime safety
+          description: `A JSON array of real, verified grants matching the data contract. Max 6 items. If zero verified options are confidently found, return an empty array [].`,
           items: {
             type: Type.OBJECT,
             properties: {
@@ -109,7 +110,7 @@ export async function POST(request) {
       },
     });
 
-    // Check if response stream cut off abruptly
+    // Check if response stream cut off abruptly before array layout finalized
     if (!response.text || response.text.trim() === "" || !response.text.endsWith("]")) {
       console.error("Raw token payload stream arrived incomplete or corrupted from engine.");
       return NextResponse.json({ error: "The engine timed out searching data. Try focusing your search area criteria tags." }, { status: 504 });

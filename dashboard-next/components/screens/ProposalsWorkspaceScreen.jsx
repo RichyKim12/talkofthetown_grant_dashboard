@@ -13,7 +13,10 @@ export function ProposalsWorkspaceScreen({
   onRemoveSelected,
 }) {
   const [activeTab, setActiveTab] = useState("selected");
-  const [activeId, setActiveId] = useState(selectedGrants[0]?.id || null);
+  
+  // FIX 1: Default to null strictly on load so no card is implicitly chosen 
+  const [activeId, setActiveId] = useState(null);
+  
   const [draftTexts, setDraftTexts] = useState({});
   const [historicalProposals, setHistoricalProposals] = useState([]);
   const [syncStatusById, setSyncStatusById] = useState({});
@@ -41,13 +44,12 @@ export function ProposalsWorkspaceScreen({
           grantTitle: cleanGrant?.grant_title || "Untitled Grant",
           grantFunder: cleanGrant?.grant_funder || "Unknown Funder",
           proposalText: text,
-          status: "draft", // Changes the DB status back to a standard active draft
+          status: "draft", 
         }),
       });
 
       if (!res.ok) throw new Error();
 
-      // Update the client state to set the status back to draft
       setHistoricalProposals((prev) =>
         prev.map((p) => (p.grant_id === grantId ? { ...p, status: "draft" } : p))
       );
@@ -87,13 +89,11 @@ export function ProposalsWorkspaceScreen({
     };
   };
 
-  // Split tabs explicitly by database row status rather than transient session existence
   const { selectedTabs, activeTabs, historyTabs } = useMemo(() => {
     const selectedList = [];
     const activeList = [];
     const historyList = [];
 
-    // 1. Setup shell placeholders for currently selected session items without drafts
     selectedGrants.forEach((g) => {
       const normalized = normalizeGrant(g);
       if (!draftTexts[normalized.grant_id]) {
@@ -101,7 +101,6 @@ export function ProposalsWorkspaceScreen({
       }
     });
 
-    // 2. Sort server records purely by their stored database life cycle state
     historicalProposals.forEach((hp) => {
       const normalized = normalizeGrant(hp);
       if (hp.status === "archived" || hp.status === "history") {
@@ -118,6 +117,18 @@ export function ProposalsWorkspaceScreen({
     };
   }, [selectedGrants, draftTexts, historicalProposals]);
 
+  // Set active tabs dynamically based on items present on initial mount hydration loops
+  useEffect(() => {
+    if (selectedGrants.length > 0) {
+      setActiveTab("selected");
+      setActiveId(selectedGrants[0].id);
+    } else if (activeTabs.length > 0) {
+      setActiveTab("active");
+    } else if (historyTabs.length > 0) {
+      setActiveTab("history");
+    }
+  }, [selectedGrants]);
+
   useEffect(() => {
     async function loadWorkspaceAndHistory() {
       setIsLoading(true);
@@ -128,7 +139,6 @@ export function ProposalsWorkspaceScreen({
         if (res.ok && data.proposals) {
           setHistoricalProposals(data.proposals);
           const cloudDrafts = data.proposals.reduce((acc, row) => {
-            // Keep both draft and archived texts accessible
             acc[row.grant_id] = row.proposal_text;
             return acc;
           }, {});
@@ -159,7 +169,6 @@ export function ProposalsWorkspaceScreen({
         ? targetGrant
         : normalizeGrant(targetGrant) || { grant_id: grantId, grant_title: "Untitled Grant", grant_funder: "Unknown Funder" };
 
-      // Find current item's true status so we don't accidentally override an archived flag
       const currentRecord = historicalProposals.find(p => p.grant_id === grantId);
       const currentStatus = currentRecord?.status || "draft";
 
@@ -260,7 +269,6 @@ export function ProposalsWorkspaceScreen({
     }
   };
 
-  // New function to manually transition a proposal into the archived history tab
   const handleArchiveToHistory = async (grantId, targetGrant) => {
     setArchivingId(grantId);
     const text = draftTexts[grantId] || "";
@@ -286,6 +294,7 @@ export function ProposalsWorkspaceScreen({
       );
 
       addToast("Proposal moved to History tab.", "success");
+      setActiveId(null); // Deselect explicitly after moving to avoid confusion
       setActiveTab("history");
     } catch (err) {
       addToast("Failed to move proposal to history.", "error");
@@ -296,8 +305,7 @@ export function ProposalsWorkspaceScreen({
 
   const handleRemoveSelected = (grantId) => {
     if (activeId === grantId) {
-      const remaining = selectedGrants.filter((g) => g.id !== grantId);
-      setActiveId(remaining[0]?.id || historicalProposals[0]?.grant_id || null);
+      setActiveId(null);
     }
     onRemoveSelected?.(grantId);
   };
@@ -320,8 +328,7 @@ export function ProposalsWorkspaceScreen({
       onRemoveSelected?.(grantId);
 
       if (activeId === grantId) {
-        const remainingSelected = selectedGrants.filter((g) => g.id !== grantId);
-        setActiveId(remainingSelected[0]?.id || null);
+        setActiveId(null);
       }
 
       addToast("Deleted permanently from history.", "success");
@@ -386,7 +393,10 @@ export function ProposalsWorkspaceScreen({
   };
 
   const allKnownTabs = [...selectedTabs, ...activeTabs, ...historyTabs];
-  const activeGrant = allKnownTabs.find((g) => g.grant_id === activeId) || allKnownTabs[0] || null;
+  
+  // FIX 2: Strict lookup mapping. If no activeId is tracked, activeGrant is deterministic null.
+  const activeGrant = activeId ? allKnownTabs.find((g) => g.grant_id === activeId) || null : null;
+  
   const activeRawGrant = activeGrant ? rawGrantsById[activeGrant.grant_id] : null;
   const hasDraftContent = activeId && draftTexts[activeId] !== undefined;
   const activeSyncStatus = (activeId && syncStatusById[activeId]) || "All changes saved to cloud";
@@ -510,7 +520,6 @@ export function ProposalsWorkspaceScreen({
                 </div>
 
                 <div className="workspace-canvas-right-actions">
-                  {/* Action button to manually push active drafts to history archive layout */}
                   {activeTab === "active" && hasDraftContent && (
                     <button
                       onClick={() => handleArchiveToHistory(activeId, activeRawGrant || activeGrant)}
@@ -521,7 +530,6 @@ export function ProposalsWorkspaceScreen({
                       {archivingId === activeId ? "Archiving..." : "Move to History"}
                     </button>
                   )}
-                  {/* Move History -> Active Draft */}
                   {activeTab === "history" && (
                     <button
                       onClick={() => handleRevertToActive(activeId, activeRawGrant || activeGrant)}
@@ -562,7 +570,6 @@ export function ProposalsWorkspaceScreen({
                         disabled={isIterating || activeTab === "history"}
                       />
 
-                      {/* Active Prompt Overlay Layout */}
                       {isIterating && (
                         <div className="workspace-editor-overlay">
                           <div className="workspace-overlay-card">
@@ -573,7 +580,6 @@ export function ProposalsWorkspaceScreen({
                       )}
                     </div>
 
-                    {/* INLINE ITERATION CHAT BAR */}
                     {activeTab !== "history" && (
                       <div className="workspace-chat-bar">
                         <input
@@ -632,7 +638,7 @@ export function ProposalsWorkspaceScreen({
               </div>
             </div>
           ) : (
-            <div className="workspace-unselected-placeholder">
+            <div className="workspace-unselected-placeholder" style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%", minHeight: "300px", color: "var(--text-muted, #6b7280)", fontSize: "1.1rem", fontWeight: "500", fontStyle: "italic" }}>
               Select an application from the sidebar tabs to begin.
             </div>
           )}
@@ -641,4 +647,3 @@ export function ProposalsWorkspaceScreen({
     </div>
   );
 }
-
