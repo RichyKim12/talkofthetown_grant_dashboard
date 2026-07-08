@@ -37,7 +37,7 @@ export async function POST(request) {
 
       [Output Format Instructions] 
 
-      Provide the output as a valid JSON Array containing exactly 10 objects. Each object must include all of the following fields: 
+      Return a valid JSON array of objects. If no matches exist, return []. Each object must contain the following fields:
 
         
 
