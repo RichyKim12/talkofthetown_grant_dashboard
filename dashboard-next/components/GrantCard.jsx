@@ -18,37 +18,37 @@ export function GrantCard({ grant, rank, selected, onToggleSelect, onNotInterest
   const [isMuting, setIsMuting] = useState(false);
   const daysLeft = daysUntil(grant.deadline);
 
-  const destinationUrl = grant.sourceUrl || "#";
+  // Guaranteed to exist due to filter operations upstream
+  const destinationUrl = grant.sourceUrl;
 
   const handleMuteClick = async () => {
     if (isMuting) return;
     setIsMuting(true);
     await onNotInterested?.(grant.id);
-    // State layout cleanup handles unmounting, but we clear flag as a safety guarantee
     setIsMuting(false);
   };
 
   return (
     <div className={`grant-card${selected ? " grant-card-selected" : ""}`}>
       <div className="grant-rank">#{rank}</div>
-
+      
       <div className="grant-card-main">
         <div className="grant-card-top">
           <div>
             <h3 className="grant-name">
-              <a
-                href={destinationUrl}
-                target="_blank"
+              <a 
+                href={destinationUrl} 
+                target="_blank" 
                 rel="noopener noreferrer"
-                style={{
-                  color: "inherit",
-                  textDecoration: "none",
-                  cursor: grant.sourceUrl ? "pointer" : "default"
+                style={{ 
+                  color: "inherit", 
+                  textDecoration: "underline",
+                  cursor: "pointer"
                 }}
-                onMouseEnter={(e) => { if (grant.sourceUrl) e.currentTarget.style.textDecoration = "underline"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "var(--primary-color, #2563eb)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "inherit"; }}
               >
-                {grant.title || grant.name || "Untitled Grant Opportunity"}
+                {grant.title || grant.name || "Untitled Grant Opportunity"} ↗
               </a>
             </h3>
             <p className="grant-funder">{grant.funder || grant.source}</p>
@@ -66,22 +66,18 @@ export function GrantCard({ grant, rank, selected, onToggleSelect, onNotInterest
             <IconClock width={13} height={13} /> Due {formatDate(grant.deadline)}
             {daysLeft <= 21 && daysLeft > 0 ? ` · ${daysLeft}d left` : ""}
           </span>
-
-          {grant.sourceUrl ? (
-            <a
-              href={destinationUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="meta-pill meta-pill-muted"
-              style={{ textDecoration: "none" }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--text-muted)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; }}
-            >
-              via {grant.source} ↗
-            </a>
-          ) : (
-            <span className="meta-pill meta-pill-muted">via {grant.source}</span>
-          )}
+          
+          <a 
+            href={destinationUrl} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="meta-pill meta-pill-muted"
+            style={{ textDecoration: "none" }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--text-muted)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; }}
+          >
+            via {grant.source} ↗
+          </a>
         </div>
 
         <div className="chip-row">
@@ -115,10 +111,10 @@ export function GrantCard({ grant, rank, selected, onToggleSelect, onNotInterest
                 ))}
               </ul>
             </div>
-            <a
-              href={destinationUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+            <a 
+              href={destinationUrl} 
+              target="_blank" 
+              rel="noopener noreferrer" 
               className="link-btn"
               style={{ fontWeight: "600", marginTop: "4px" }}
             >
@@ -127,6 +123,7 @@ export function GrantCard({ grant, rank, selected, onToggleSelect, onNotInterest
           </div>
         )}
 
+        {/* Noticeable "Not Interested" pill styled button action panel row */}
         <div className="grant-select-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1.5rem", paddingTop: "1rem", borderTop: "1px solid var(--border, #e5e7eb)" }}>
           <label className="checkbox-row" style={{ cursor: "pointer" }}>
             <input type="checkbox" checked={selected} onChange={() => onToggleSelect(grant.id)} />
@@ -151,13 +148,13 @@ export function GrantCard({ grant, rank, selected, onToggleSelect, onNotInterest
               display: "inline-flex",
               alignItems: "center"
             }}
-            onMouseEnter={(e) => {
+            onMouseEnter={(e) => { 
               if (!isMuting) {
                 e.currentTarget.style.backgroundColor = "#fee2e2";
                 e.currentTarget.style.borderColor = "#ef4444";
               }
             }}
-            onMouseLeave={(e) => {
+            onMouseLeave={(e) => { 
               if (!isMuting) {
                 e.currentTarget.style.backgroundColor = "#fef2f2";
                 e.currentTarget.style.borderColor = "#fca5a5";
