@@ -5,6 +5,8 @@ import { GoogleGenAI, Type } from "@google/genai";
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export async function POST(request) {
+
+  
   try {
     const { profile } = await request.json();
 
@@ -54,11 +56,11 @@ export async function POST(request) {
 
     console.log(prompt);
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: prompt,
       config: {
         temperature: 0.1,    // Kept low for high predictability and factuality
-        topP: 0.2,           
+        topP: 0.2,
         maxOutputTokens: 4096,
 
         responseMimeType: "application/json",
@@ -109,7 +111,8 @@ export async function POST(request) {
         },
       },
     });
-
+    console.log(response.candidates?.[0]?.finishReason);
+    console.log(response.usageMetadata);
     // Check if response stream cut off abruptly before array layout finalized
     if (!response.text || response.text.trim() === "" || !response.text.endsWith("]")) {
       console.error("Raw token payload stream arrived incomplete or corrupted from engine.");
