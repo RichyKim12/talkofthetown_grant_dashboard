@@ -6,7 +6,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export async function POST(request) {
 
-  
+
   try {
     const { profile } = await request.json();
 
@@ -37,6 +37,7 @@ export async function POST(request) {
       2. REAL LINKS REQUIRED: The "sourceUrl" must be a real, official link to the grant guidelines, application form, or foundation home portal. If you cannot verify a real web link for an opportunity, DO NOT include it.
       3. FUTURE DEADLINES ONLY: Today's date is strictly ${formattedToday}. Every returned opportunity MUST have an application deadline or cycle window that closes AFTER ${formattedToday}.
       4. ZERO-QUOTA & MAXIMUM CAP POLICY: There is no minimum item requirement. If no highly accurate, real-world matches with verifiable links are available for this profile, return an empty array [] exactly. If multiple matches exist, you MUST only return the TOP 6 highest-scoring opportunities max. Quality and strict factual accuracy are preferred over quantity.
+      5. FOR-PROFIT ELIGIBILITY ONLY: Do not return traditional non-profit grants (like standard CACF or Virginia Humanities project grants). UNLESS they explicitly allow for-profit entities or have a dedicated small business commercial track. Focus instead on corporate small business grants (e.g., FedEx, Venmo, Barclays, Local Chambers) and local state/city economic growth grants. 
 
       [Output Format Instructions] 
       Return a valid JSON array of objects. If no matches exist, return []. Each object must contain the following fields:
@@ -54,15 +55,17 @@ export async function POST(request) {
       - requirements: An array of short text strings detailing the prerequisite criteria or documents needed to apply for the grant. 
     `;
 
-    console.log(prompt);
+    // console.log(prompt);
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash",
       contents: prompt,
       config: {
         temperature: 0.1,    // Kept low for high predictability and factuality
         topP: 0.2,
-        maxOutputTokens: 4096,
-
+        maxOutputTokens: 8192,
+        thinkingConfig: {
+          thinkingBudget: 1024, // cap reasoning tokens so output isn't starved
+        },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
