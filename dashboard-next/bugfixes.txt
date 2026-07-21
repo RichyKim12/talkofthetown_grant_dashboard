@@ -11,3 +11,8 @@ Need to implement saved grants vs not interested grants
 filter based on match rating score.
 
 temp storage for what was already stored.
+
+Take out the relevancy filter **
+
+Application fee information
+
