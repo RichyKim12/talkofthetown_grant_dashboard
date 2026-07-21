@@ -103,7 +103,7 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
         body: JSON.stringify({
           profile,
           historyIds: historicalIds,
-          temporarySeenIds: seenGrantIds,
+          // temporarySeenIds: seenGrantIds,
           notInterestedIds: notInterestedIds
         }),
       });
@@ -241,7 +241,7 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
         </div>
 
         {/* Persistent Dynamic Match Score Slider Row UI */}
-        <div className="filter-row" style={{ borderTop: "1px solid var(--border, #e5e7eb)", paddingTop: "1rem", display: "flex", alignItems: "center" }}>
+        {/* <div className="filter-row" style={{ borderTop: "1px solid var(--border, #e5e7eb)", paddingTop: "1rem", display: "flex", alignItems: "center" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", width: "100%", maxWidth: "340px" }}>
             <label style={{ fontSize: "0.85rem", fontWeight: "600", color: "var(--text-secondary)" }}>
               Minimum Relevancy Filter Cutoff: <span style={{ color: "var(--primary-color, #2563eb)", fontWeight: "700" }}>{minMatchScore}%</span>
@@ -256,7 +256,7 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
               style={{ width: "100%", cursor: "pointer", accentColor: "var(--primary-color, #2563eb)" }}
             />
           </div>
-        </div>
+        </div> */}
 
         {(phase === "searching" || phase === "ranking") && (
           <div className="progress-line" role="status" aria-live="polite" style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem" }}>
