@@ -174,10 +174,10 @@ export default function DashboardRoot() {
 
       <aside className={`sidebar${navOpen ? " sidebar-open" : ""}`}>
         <div className="sidebar-brand">
-          <div className="brand-mark">LV</div>
+          {/* <div className="brand-mark">LV</div> */}
           <div>
             <p className="brand-name">{profile?.orgName || "Dashboard"}</p>
-            <p className="brand-sub">Grant assistant</p>
+            <p className="brand-sub">Grant assistant dashboard</p>
           </div>
         </div>
         <ProgressSteps current={screen} onJump={goTo} completed={completed} />

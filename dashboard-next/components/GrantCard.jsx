@@ -53,7 +53,7 @@ export function GrantCard({ grant, rank, selected, onToggleSelect, onNotInterest
             </h3>
             <p className="grant-funder">{grant.funder || grant.source}</p>
           </div>
-          <ScoreBadge score={grant.score || grant.matchScore} />
+          {/* <ScoreBadge score={grant.score || grant.matchScore} /> */}
         </div>
 
         <p className="grant-summary">{grant.summary}</p>

@@ -59,9 +59,11 @@ export async function POST(request) {
     const interaction = await ai.interactions.create({
       model: "gemini-3.5-flash",
       input: prompt,
+      // tools: [{ type: "google_search" }],
       generation_config: {
         temperature: 1.0,
         max_output_tokens: 5000,   // <-- see note below
+        
         thinking_level: "medium",  // matches AI Studio; note: snake_case per docs
       },
       response_format: [
