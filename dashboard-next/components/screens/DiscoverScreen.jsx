@@ -109,7 +109,25 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Failed API fetch communication.");
+
+      if (!response.ok) {
+        // Construct detailed error message based on response status and error body
+        const errMessage = data.error || "";
+
+        if (response.status === 429 || errMessage.toLowerCase().includes("rate limit") || errMessage.toLowerCase().includes("quota")) {
+          throw new Error("GEMINI_TRAFFIC");
+        } else if (
+          response.status === 401 ||
+          response.status === 403 ||
+          errMessage.toLowerCase().includes("key") ||
+          errMessage.toLowerCase().includes("credential") ||
+          errMessage.toLowerCase().includes("unauthorized")
+        ) {
+          throw new Error("BACKEND_AUTH");
+        } else {
+          throw new Error(errMessage || "Failed API fetch communication.");
+        }
+      }
 
       setPhase("ranking");
       setProgressMsg("Sifting and scoring matches...");
@@ -148,9 +166,18 @@ export function DiscoverScreen({ profile, grants, setGrants, selectedIds, setSel
       onFoundGrants();
       addToast(`Found ${freshGrants.length} matching grants meeting your threshold metrics.`, "success");
     } catch (err) {
-      console.error(err);
+      console.error("Discovery error:", err);
       setPhase("idle");
-      addToast("Couldn't complete the search. Verify backend credentials.", "error");
+
+      const message = err?.message || "";
+
+      if (message === "GEMINI_TRAFFIC" || message.toLowerCase().includes("rate limit")) {
+        addToast("Gemini is currently experiencing high traffic. Please try again in a moment.", "error");
+      } else if (message === "BACKEND_AUTH" || message.toLowerCase().includes("credential") || message.toLowerCase().includes("key")) {
+        addToast("Authentication failed. Please check your backend credentials or API key configuration.", "error");
+      } else {
+        addToast(message || "Couldn't complete the search. Please check your connection and try again.", "error");
+      }
     }
   };
 

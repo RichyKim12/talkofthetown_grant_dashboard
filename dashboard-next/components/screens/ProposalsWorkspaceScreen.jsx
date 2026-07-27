@@ -13,10 +13,10 @@ export function ProposalsWorkspaceScreen({
   onRemoveSelected,
 }) {
   const [activeTab, setActiveTab] = useState("selected");
-  
+
   // FIX 1: Default to null strictly on load so no card is implicitly chosen 
   const [activeId, setActiveId] = useState(null);
-  
+
   const [draftTexts, setDraftTexts] = useState({});
   const [historicalProposals, setHistoricalProposals] = useState([]);
   const [syncStatusById, setSyncStatusById] = useState({});
@@ -44,7 +44,7 @@ export function ProposalsWorkspaceScreen({
           grantTitle: cleanGrant?.grant_title || "Untitled Grant",
           grantFunder: cleanGrant?.grant_funder || "Unknown Funder",
           proposalText: text,
-          status: "draft", 
+          status: "draft",
         }),
       });
 
@@ -369,23 +369,60 @@ export function ProposalsWorkspaceScreen({
 
   const downloadAsDoc = (grant) => {
     const text = draftTexts[grant.grant_id] || "";
-    const htmlContent = `
-      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-      <head><title>${grant.grant_title}</title><style>body { font-family: Arial; line-height: 1.5; }</style></head>
-      <body>
-        <h2>${grant.grant_title}</h2>
-        <p><b>Funder:</b> ${grant.grant_funder}</p>
-        <hr/>
-        <p style="white-space: pre-wrap;">${text}</p>
-      </body>
-      </html>
-    `;
 
-    const blob = new Blob(['\ufeff' + htmlContent], { type: 'application/msword' });
+    // 1. Convert Markdown formatting (if present) into HTML elements Word understands
+    let formattedHtml = text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      // Headers
+      .replace(/^### (.*$)/gim, "<h3>$1</h3>")
+      .replace(/^## (.*$)/gim, "<h2>$1</h2>")
+      .replace(/^# (.*$)/gim, "<h1>$1</h1>")
+      // Bold & Italics
+      .replace(/\*\*(.*?)\*\*/g, "<b>$1</b>")
+      .replace(/\*(.*?)\*/g, "<i>$1</i>")
+      // Line breaks to proper HTML paragraphs
+      .split(/\n\s*\n/)
+      .map((paragraph) => `<p>${paragraph.replace(/\n/g, "<br/>")}</p>`)
+      .join("");
+
+    // 2. Add Microsoft Word XML directives for proper structure and styling
+    const htmlContent = `
+    <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+    <head>
+      <meta charset="utf-8">
+      <title>${grant.grant_title}</title>
+      <style>
+        body { 
+          font-family: Arial, sans-serif; 
+          font-size: 11pt; 
+          line-height: 1.5; 
+          color: #111827; 
+        }
+        h1 { font-size: 18pt; font-weight: bold; margin-bottom: 6pt; color: #111827; }
+        h2 { font-size: 14pt; font-weight: bold; margin-bottom: 4pt; color: #374151; }
+        h3 { font-size: 12pt; font-weight: bold; margin-bottom: 4pt; color: #4b5563; }
+        p { margin-bottom: 10pt; line-height: 1.5; }
+        hr { border: none; border-top: 1px solid #e5e7eb; margin: 12pt 0; }
+        .meta-label { color: #4b5563; font-weight: bold; }
+      </style>
+    </head>
+    <body>
+      <h1>${grant.grant_title}</h1>
+      <p><span class="meta-label">Funder:</span> ${grant.grant_funder}${grant.amount ? ` | ${grant.amount}` : ""
+      }</p>
+      <hr/>
+      <div>${formattedHtml}</div>
+    </body>
+    </html>
+  `;
+
+    const blob = new Blob(["\ufeff" + htmlContent], { type: "application/msword" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = `${grant.grant_title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_proposal.doc`;
+    a.download = `${grant.grant_title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_proposal.doc`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -393,10 +430,10 @@ export function ProposalsWorkspaceScreen({
   };
 
   const allKnownTabs = [...selectedTabs, ...activeTabs, ...historyTabs];
-  
+
   // FIX 2: Strict lookup mapping. If no activeId is tracked, activeGrant is deterministic null.
   const activeGrant = activeId ? allKnownTabs.find((g) => g.grant_id === activeId) || null : null;
-  
+
   const activeRawGrant = activeGrant ? rawGrantsById[activeGrant.grant_id] : null;
   const hasDraftContent = activeId && draftTexts[activeId] !== undefined;
   const activeSyncStatus = (activeId && syncStatusById[activeId]) || "All changes saved to cloud";
