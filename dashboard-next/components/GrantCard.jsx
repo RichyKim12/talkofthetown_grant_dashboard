@@ -21,6 +21,9 @@ export function GrantCard({ grant, rank, selected, onToggleSelect, onNotInterest
   // Guaranteed to exist due to filter operations upstream
   const destinationUrl = grant.sourceUrl;
 
+  // applicationFee is a required string field from the API ("None" when there isn't one)
+  const hasApplicationFee = grant.applicationFee && grant.applicationFee !== "None";
+
   const handleMuteClick = async () => {
     if (isMuting) return;
     setIsMuting(true);
@@ -62,6 +65,11 @@ export function GrantCard({ grant, rank, selected, onToggleSelect, onNotInterest
           <span className="meta-pill">
             ${grant.amountMin?.toLocaleString() || "0"}–${grant.amountMax?.toLocaleString() || "0"}
           </span>
+          {hasApplicationFee && (
+            <span className="meta-pill meta-pill-muted">
+              Application fee: {grant.applicationFee}
+            </span>
+          )}
           <span className={`meta-pill${daysLeft <= 14 ? " meta-pill-urgent" : ""}`}>
             <IconClock width={13} height={13} /> Due {formatDate(grant.deadline)}
             {daysLeft <= 21 && daysLeft > 0 ? ` · ${daysLeft}d left` : ""}
@@ -111,6 +119,12 @@ export function GrantCard({ grant, rank, selected, onToggleSelect, onNotInterest
                 ))}
               </ul>
             </div>
+            {hasApplicationFee && (
+              <div>
+                <strong>Application fee</strong>
+                <p>{grant.applicationFee}</p>
+              </div>
+            )}
             <a 
               href={destinationUrl} 
               target="_blank" 

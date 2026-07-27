@@ -39,6 +39,7 @@ export async function POST(request) {
       3. FUTURE DEADLINES ONLY: Today's date is strictly ${formattedToday}. Every returned opportunity MUST have an application deadline or cycle window that closes AFTER ${formattedToday}.
       4. ZERO-QUOTA & MAXIMUM CAP POLICY: There is no minimum item requirement. If no highly accurate, real-world matches with verifiable links are available for this profile, return an empty array [] exactly. If multiple matches exist, you MUST only return the TOP 6 highest-scoring opportunities max. Quality and strict factual accuracy are preferred over quantity.
       5. FOR-PROFIT ELIGIBILITY ONLY: Do not return traditional non-profit grants (like standard CACF or Virginia Humanities project grants). UNLESS they explicitly allow for-profit entities or have a dedicated small business commercial track. Focus instead on corporate small business grants (e.g., FedEx, Venmo, Barclays, Local Chambers) and local state/city economic growth grants. 
+      6. APPLICATION FEE ACCURACY: Only state a specific application fee amount if you are confident it is accurate for this opportunity. If there is no fee, or you cannot confirm one, use the exact string "None" rather than guessing a number.
 
       [Output Format Instructions] 
       Return a valid JSON array of objects. If no matches exist, return []. Each object must contain the following fields:
@@ -54,6 +55,7 @@ export async function POST(request) {
       - matchScore: Relevancy matching score from 1 to 100 based on their profile. 
       - matchedFocuses: An array of short text strings representing the subset of the user's focus areas that align with this specific grant. 
       - requirements: An array of short text strings detailing the prerequisite criteria or documents needed to apply for the grant. 
+      - applicationFee: The exact application fee if one exists, as a plain string (e.g. "$25", "$100"). If there is no fee, or you cannot confirm one exists, use the exact string "None" — do not guess a number.
     `;
 
     const interaction = await ai.interactions.create({
@@ -63,7 +65,7 @@ export async function POST(request) {
       generation_config: {
         temperature: 1.0,
         max_output_tokens: 5000,   // <-- see note below
-        
+
         thinking_level: "medium",  // matches AI Studio; note: snake_case per docs
       },
       response_format: [
@@ -86,9 +88,10 @@ export async function POST(request) {
                 summary: { type: "string", description: "Comprehensive description explaining the relevance." },
                 matchScore: { type: "integer", description: "Relevancy matching score from 1 to 100." },
                 matchedFocuses: { type: "array", items: { type: "string" } },
-                requirements: { type: "array", items: { type: "string" } }
+                requirements: { type: "array", items: { type: "string" } },
+                applicationFee: { type: "string", description: "The application fee as a dollar string (e.g. '$25'), or the exact string 'None' if there is no fee or it cannot be confirmed." }
               },
-              required: ["id","title","source","sourceUrl","amountMin","amountMax","deadline","summary","matchScore","matchedFocuses","requirements"]
+              required: ["id","title","source","sourceUrl","amountMin","amountMax","deadline","summary","matchScore","matchedFocuses","requirements","applicationFee"]
             }
           }
         }
