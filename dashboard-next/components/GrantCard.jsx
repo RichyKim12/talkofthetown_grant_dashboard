@@ -18,11 +18,11 @@ export function GrantCard({ grant, rank, selected, onToggleSelect, onNotInterest
   const [isMuting, setIsMuting] = useState(false);
   const daysLeft = daysUntil(grant.deadline);
 
-  // Guaranteed to exist due to filter operations upstream
   const destinationUrl = grant.sourceUrl;
 
-  // applicationFee is a required string field from the API ("None" when there isn't one)
-  const hasApplicationFee = grant.applicationFee && grant.applicationFee !== "None";
+  // Check if there is an active fee vs. free/none
+  const rawFee = grant.applicationFee?.trim();
+  const hasFee = rawFee && rawFee.toLowerCase() !== "none" && rawFee.toLowerCase() !== "free" && rawFee !== "$0";
 
   const handleMuteClick = async () => {
     if (isMuting) return;
@@ -37,39 +37,58 @@ export function GrantCard({ grant, rank, selected, onToggleSelect, onNotInterest
       
       <div className="grant-card-main">
         <div className="grant-card-top">
-          <div>
-            <h3 className="grant-name">
-              <a 
-                href={destinationUrl} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                style={{ 
-                  color: "inherit", 
-                  textDecoration: "underline",
-                  cursor: "pointer"
+          <div style={{ flex: 1 }}>
+            {/* Title & Fee Pill Header Row */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+              <h3 className="grant-name" style={{ margin: 0 }}>
+                <a 
+                  href={destinationUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={{ 
+                    color: "inherit", 
+                    textDecoration: "underline",
+                    cursor: "pointer"
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = "var(--primary-color, #2563eb)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = "inherit"; }}
+                >
+                  {grant.title || grant.name || "Untitled Grant Opportunity"} ↗
+                </a>
+              </h3>
+
+              {/* Title Fee Badge */}
+              <span 
+                style={{
+                  fontSize: "0.75rem",
+                  fontWeight: "600",
+                  padding: "2px 8px",
+                  borderRadius: "12px",
+                  whiteSpace: "nowrap",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  backgroundColor: hasFee ? "#fef2f2" : "#f0fdf4",
+                  color: hasFee ? "#dc2626" : "#16a34a",
+                  border: `1px solid ${hasFee ? "#fca5a5" : "#86efac"}`
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "var(--primary-color, #2563eb)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "inherit"; }}
               >
-                {grant.title || grant.name || "Untitled Grant Opportunity"} ↗
-              </a>
-            </h3>
-            <p className="grant-funder">{grant.funder || grant.source}</p>
+                {hasFee ? `App Fee: ${rawFee}` : "No Application Fee"}
+              </span>
+            </div>
+
+            <p className="grant-funder" style={{ marginTop: "0.25rem" }}>{grant.funder || grant.source}</p>
           </div>
           {/* <ScoreBadge score={grant.score || grant.matchScore} /> */}
         </div>
 
         <p className="grant-summary">{grant.summary}</p>
 
+        {/* Updated Meta Row (App Fee pill removed from here to prevent redundancy) */}
         <div className="grant-meta-row">
           <span className="meta-pill">
             ${grant.amountMin?.toLocaleString() || "0"}–${grant.amountMax?.toLocaleString() || "0"}
           </span>
-          {hasApplicationFee && (
-            <span className="meta-pill meta-pill-muted">
-              Application fee: {grant.applicationFee}
-            </span>
-          )}
+
           <span className={`meta-pill${daysLeft <= 14 ? " meta-pill-urgent" : ""}`}>
             <IconClock width={13} height={13} /> Due {formatDate(grant.deadline)}
             {daysLeft <= 21 && daysLeft > 0 ? ` · ${daysLeft}d left` : ""}
@@ -119,12 +138,10 @@ export function GrantCard({ grant, rank, selected, onToggleSelect, onNotInterest
                 ))}
               </ul>
             </div>
-            {hasApplicationFee && (
-              <div>
-                <strong>Application fee</strong>
-                <p>{grant.applicationFee}</p>
-              </div>
-            )}
+            <div>
+              <strong>Application fee</strong>
+              <p>{hasFee ? rawFee : "None (Free)"}</p>
+            </div>
             <a 
               href={destinationUrl} 
               target="_blank" 
