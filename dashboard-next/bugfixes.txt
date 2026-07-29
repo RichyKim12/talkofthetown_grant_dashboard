@@ -1,0 +1,18 @@
+How to properly guardrail against hallucinations for the gemini prompts
+
+How to do evaluation frameworks.
+
+Implement hyperlinks properly to view the original listing.
+
+Need to do proper hyperlinks
+
+Need to implement saved grants vs not interested grants
+
+filter based on match rating score.
+
+temp storage for what was already stored.
+
+Take out the relevancy filter **
+
+Application fee information
+
